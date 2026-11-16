@@ -690,7 +690,10 @@ export default function DashboardPortfolioTemplate() {
             {/* KPI metric cards */}
             <Grid columns={{minWidth: 280, max: 2, repeat: 'fit'}} gap={4}>
               {Array.from({length: Math.ceil(metrics.length / 2)}, (_, i) => (
-                <Grid key={i} columns={{minWidth: 280, max: 2, repeat: 'fit'}} gap={4}>
+                <Grid
+                  key={i}
+                  columns={{minWidth: 280, max: 2, repeat: 'fit'}}
+                  gap={4}>
                   {metrics.slice(i * 2, i * 2 + 2).map(m => (
                     <MetricCard key={m.label} {...m} />
                   ))}
