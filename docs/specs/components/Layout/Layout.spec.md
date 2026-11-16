@@ -86,6 +86,9 @@ closed start or end slot gives the same FR6 composition as an omitted one
 - The Layout container, its `layout` target, and the five slot positions.
 - Height, the Layout-edge inset, content width, and the header and footer
   divider default that its region components read.
+- The container context, `LayoutContainerContext`: Card, Dialog, and
+  BottomSheet name themselves through it, and LayoutHeader and LayoutFooter
+  reflect the name as `container` (DEC-2).
 - The aggregate consumer document and theming map for the `layout`,
   `layout-header`, `layout-panel`, `layout-content`, and `layout-footer`
   targets.
@@ -230,6 +233,25 @@ AppShell is the page shell. Layout is the general layout primitive for arranging
 the `header`, `start`, `content`, `end`, and `footer` slots within a page or
 bounded container. Container-padding participation by Section, Table, Toolbar,
 and Divider does not make those components Layout-owned anatomy.
+
+### DEC-2 — Containers name themselves to the Layout inside them
+
+**Reference:** `component:Layout/DEC-2`
+
+Card, Dialog, and BottomSheet provide `LayoutContainerContext`, a
+layer-scoped context in `Layout/LayoutContainerContext.ts`, with `card`,
+`dialog`, or `bottom-sheet`. LayoutHeader and LayoutFooter read it and
+reflect it as `data-container`, so a theme styles one container's header or
+footer without another's (`component:LayoutHeader` DEC-1,
+`component:LayoutFooter` DEC-1). The context is layer-scoped, so a menu or
+popover opened from inside a container starts with none.
+
+A separate context is needed because the container is not Layout's to know:
+Layout renders the same inside a card, a dialog, or a page, and only the
+container knows what it is. `LayoutDividerContext` cannot carry it: Layout
+provides that context itself, from its own divider default, so it shadows any
+value a container sets above it. `LayoutSlotsContext` and `LayoutAreaContext`
+are also provided by Layout, for slot and area facts.
 
 ## Open questions
 

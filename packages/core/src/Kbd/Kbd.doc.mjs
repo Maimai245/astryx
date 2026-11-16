@@ -95,7 +95,7 @@ export const docs = {
     },
   ],
   theming: {
-    targets: [{className: 'astryx-kbd'}],
+    targets: [{className: 'astryx-kbd'}, {className: 'astryx-kbd-key'}],
   },
   usage: {
     anatomy,
@@ -142,7 +142,7 @@ export const docsZh = {
     },
   ],
   theming: {
-    targets: [{className: 'astryx-kbd'}],
+    targets: [{className: 'astryx-kbd'}, {className: 'astryx-kbd-key'}],
   },
   usage: {
     anatomy,
