@@ -67,7 +67,10 @@ describe('a paint drawn inside a part', () => {
       themeEditSet('i', 'background-color', '#888888', {cwd, on: 'kbd'}),
     );
     expect(kbd.code).toBe('ERR_THEME_NO_EFFECT');
-    expect(kbd.run[0]).toMatch(/ set i --color-neutral '#888888' --on kbd$/);
+    expect(kbd.message).toMatch(/kbd draws no box of its own: kbd-key/);
+    expect(kbd.run[0]).toMatch(
+      / set i background-color '#888888' --on kbd-key$/,
+    );
     const item = await refusal(() =>
       themeEditSet('i', 'color', '#ff0000', {cwd, on: 'radio-list-item'}),
     );
@@ -77,10 +80,10 @@ describe('a paint drawn inside a part', () => {
     );
     // (A part that paints its own fill keeps the property.)
     await themeEditSet('i', 'background-color', '#888888', {cwd, on: 'card'});
-    // The words for a keyboard key read Kbd, answered with its token.
+    // The words for a keyboard key read Kbd's key badge, which paints it.
     const keys = await answer('make the keyboard keys gray', 'i');
-    expect(keys.parts).toContain('kbd');
-    expect(keys.writes.join('\n')).toMatch(/--color-neutral .* --on kbd/);
+    expect(keys.parts).toContain('kbd-key');
+    expect(keys.writes.join('\n')).toMatch(/ --on kbd-key\b/);
     const text = await answer('make the radio list item text red', 'i');
     expect(text.writes.join('\n')).not.toMatch(
       / color '#dc2626' --on radio-list-item/,

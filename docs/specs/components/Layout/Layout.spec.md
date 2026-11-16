@@ -40,15 +40,15 @@ system_specs: [spec:AST-038]
 
 ## Contract at a glance
 
-| Area                    | Contract                                                                                                                                                          |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Public contract         | Five ReactNode slots (`header`, `start`, `content`, `end`, `footer`), `children` as content shorthand, `height`, `padding`, `contentWidth`, `defaultHasDividers`. |
-| Behavior                | Layout arranges caller content in five named slots, fills or grows with its container, and sets the inset and content width its region components use.            |
-| End-user impact         | People see headers, side panels, content, and footers in stable positions that mirror in right-to-left, with content aligned to one readable width.               |
-| Builder impact          | None; the record describes shipped behavior.                                                                                                                      |
-| Compatibility/readiness | Released behavior recorded as current; no API, default, or output changes. No implementation gap is open (Current-state impact).                                  |
-| Review checks           | Reject a target added to arbitrary slot content, an inherited parent Layout padding, a content scrollbar moved off the open edge, or overridable `data-height`.   |
-| Governing rules         | `family:layout-regions` FR1–FR12; `architecture:container-padding`; `architecture:component-theming-surface`; `architecture:public-component-api` INV5–INV8.      |
+| Area                    | Contract                                                                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public contract         | Five ReactNode slots (`header`, `start`, `content`, `end`, `footer`), `children` as content shorthand, `height`, `padding`, `contentWidth`, `defaultHasDividers`.                   |
+| Behavior                | Layout arranges caller content in five named slots, fills or grows with its container, and sets the inset and content width its region components use.                              |
+| End-user impact         | People see headers, side panels, content, and footers in stable positions that mirror in right-to-left, with content aligned to one readable width.                                 |
+| Builder impact          | A theme styles one container's header or footer through the `container` state their roots reflect (DEC-2).                                                                          |
+| Compatibility/readiness | Additive: Card, Dialog, and BottomSheet name themselves to the Layout inside them (DEC-2); no prop, default, or style change. No implementation gap is open (Current-state impact). |
+| Review checks           | Reject a target added to arbitrary slot content, an inherited parent Layout padding, a content scrollbar moved off the open edge, or overridable `data-height`.                     |
+| Governing rules         | `family:layout-regions` FR1–FR12; `architecture:container-padding`; `architecture:component-theming-surface`; `architecture:public-component-api` INV5–INV8.                        |
 
 This table is a review projection; the body below is authoritative.
 
@@ -64,8 +64,8 @@ Consumer syntax and examples belong in `Layout.doc.mjs`.
 
 - Released default preserved: `yes` — `height="fill"`, no padding override,
   no content width, divider defaults inherited.
-- Compatibility class: records shipped behavior; no public prop, default, DOM,
-  target, or styling output changes.
+- Compatibility class: additive; the header and footer reflect the container
+  they sit in (DEC-2). No prop, default, or style change.
 - Controlled/uncontrolled behavior: not applicable
 - Migration decision: none
 

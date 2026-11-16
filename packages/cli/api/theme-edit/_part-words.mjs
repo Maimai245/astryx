@@ -28,6 +28,12 @@ export const OVERRIDES = [
   ],
   [/\baccordions?\b/, {on: 'collapsible'}],
   [/\bcombo ?box(es)?\b/, {on: 'complex-selector'}],
+  // A calendar's range band, and the band a hover would select.
+  [
+    /\b(?:calendar\s+)?range\s+preview(?:\s+bands?)?\b|\bpreview\s+bands?\b/,
+    {on: 'calendar-range-preview'},
+  ],
+  [/\b(?:calendar\s+)?range\s+bands?\b/, {on: 'calendar-range'}],
   [/\bnotifications?\b/, {on: 'toast'}],
   [/\b(focus (ring|outline)s?)\b/, {on: 'focus-ring'}],
   [/\b((modal |dialog )?(overlay|scrim|backdrop))\b/, {on: 'overlay'}],
@@ -130,11 +136,13 @@ export const OVERRIDES = [
   ],
   [/\b((table )?cells?)\b/, {on: 'table-cell'}],
   [/\b(table rows?|rows?|tables?)\b/, {on: 'table-row'}],
-  // (A keyboard key, "the key chips", is Core's Kbd, never a badge.)
+  // (A keyboard key, "the key chips", is one of Kbd's key badges, never a
+  // Badge; a keyboard shortcut is the whole Kbd.)
   [
-    /\b(kbds?|keyboard (keys?|shortcuts?|chips?)|key ?(chips?|caps?)|shortcut keys?)\b/,
-    {on: 'kbd'},
+    /\b(keyboard (keys?|chips?)|key ?(chips?|caps?)|shortcut keys?)\b/,
+    {on: 'kbd-key'},
   ],
+  [/\b(kbds?|keyboard shortcuts?)\b/, {on: 'kbd'}],
   [/\b(badges?|chips?|tags?)\b/, {on: 'badge'}],
   [/\bh([1-6])\b/, {on: 'heading'}],
   [/\b(headings?|titles?)\b/, {on: 'heading'}],

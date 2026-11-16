@@ -223,6 +223,8 @@ const TEXT_WORDS =
 
 /** Plain words that are never corrected, though one letter off a VOCAB word. */
 const KEEP = new Set([
+  // A range (a calendar's range band, a date range) is no color.
+  'range',
   // A reader (a book reader, a feed reader) is no header.
   'reader',
   'readers',

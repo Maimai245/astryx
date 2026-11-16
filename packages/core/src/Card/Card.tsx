@@ -30,7 +30,7 @@ import type {Elevation, SizeValue, SpacingStep} from '../utils/types';
 import {mergeProps} from '../utils';
 import type {BaseProps} from '../BaseProps';
 import {themeProps} from '../utils/themeProps';
-import {LayoutContainerContext} from '../Layout/LayoutContainerContext';
+import {LayoutContainerScope} from '../Layout/LayoutContainerScope';
 import type {CardVariantMap} from './index';
 
 // =============================================================================
@@ -340,7 +340,7 @@ export function Card({
         style,
       )}
       {...props}>
-      <LayoutContainerContext value="card">{children}</LayoutContainerContext>
+      <LayoutContainerScope container="card">{children}</LayoutContainerScope>
     </div>
   );
 }

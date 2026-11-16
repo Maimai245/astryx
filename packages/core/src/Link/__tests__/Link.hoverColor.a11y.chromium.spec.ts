@@ -136,7 +136,10 @@ for (const [story, takesIt] of [
     await anchor.hover();
     await page.waitForTimeout(300);
     const hovered = (await colors(page)).root;
-    if (takesIt) expect(hovered).toBe('rgb(1, 2, 3)');
-    else expect(hovered).not.toBe('rgb(1, 2, 3)');
+    if (takesIt) {
+      expect(hovered).toBe('rgb(1, 2, 3)');
+    } else {
+      expect(hovered).not.toBe('rgb(1, 2, 3)');
+    }
   });
 }

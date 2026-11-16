@@ -42,7 +42,7 @@ system_specs: []
 | Behavior                | Card paints a rounded surface, publishes its padding to descendants through the container-padding protocol, and only the `default` variant draws a border.                                               |
 | End-user impact         | Readers see grouped content on a consistent surface; with the default border and theme border width, content insets stay on the spacing scale whether or not a border is drawn, except at zero padding.  |
 | Builder impact          | A Layout header or footer inside a Card reflects `container="card"` for themes.                                                                                                                          |
-| Compatibility/readiness | Released behavior recorded as current; no API, default, or output changes. One implementation gap is listed under Current-state impact.                                                                  |
+| Compatibility/readiness | Additive: a Layout header or footer inside a Card reflects `data-container="card"` (FR7); no prop, default, or style change. One implementation gap is listed under Current-state impact.                |
 | Review checks           | Reject a card that holds its track at min-content width, a variant that falls through to another variant, a lost padding publication, or a published inset that drifts further from the applied padding. |
 | Governing rules         | `architecture:container-padding` (container publisher); `architecture:component-theming-surface/INV6,INV14`; `architecture:public-component-api/INV5,INV6,INV8`.                                         |
 
@@ -57,8 +57,8 @@ so Layout and other descendants align to it.
 ## Compatibility and migration
 
 - Released default preserved: `yes`
-- Compatibility class: records shipped behavior; no public prop, default, DOM,
-  or styling output changes
+- Compatibility class: additive; a Layout header or footer inside a Card
+  reflects `data-container="card"` (FR7). No prop, default, or style change
 - Controlled/uncontrolled behavior: not applicable
 - Migration decision: none
 
@@ -140,7 +140,9 @@ Consumer migration instructions belong in consumer docs and release notes.
 
 ### Performance and resources
 
-- **PR1 — Static render.** Card holds no state and uses no hooks.
+- **PR1 — Static render.** Card holds no state and uses no hooks. It renders
+  its children through a client island that names it to a Layout inside it
+  (FR7); the island adds no element and renders nothing of its own.
 
 ## Accessibility contract
 

@@ -63,7 +63,8 @@ Consumer usage lives in `Link.doc.mjs`.
 
 - Released default preserved: `yes`; `color="accent"`, `type="body"`,
   `display="inline"`, `maxLines={0}`, no underline at rest
-- Compatibility class: records shipped behavior; no public prop, default,
+- Compatibility class: additive; an accent link's hover reads
+  `--link-hover-color` (FR11, DEC-1), unset by default; no prop, default,
   export, or DOM change; the label inherits the root's color, so a theme restyles
   Link's color through the `link` target, not the `text` target
 - Controlled/uncontrolled behavior: not applicable
