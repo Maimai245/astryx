@@ -123,7 +123,7 @@ export default function SettingsTemplate() {
                 </TabList>
               </VStack>
             )}
-            <Grid columns={{minWidth: 320}} gap={10}>
+            <Grid columns={{minWidth: 320, max: 3}} gap={10}>
               <VStack gap={1}>
                 <Heading level={3}>Basic information</Heading>
                 <Text type="supporting" color="secondary">
@@ -169,7 +169,7 @@ export default function SettingsTemplate() {
 
             <Divider />
 
-            <Grid columns={{minWidth: 320}} gap={10}>
+            <Grid columns={{minWidth: 320, max: 3}} gap={10}>
               <VStack gap={1}>
                 <Heading level={3}>Change password</Heading>
                 <Text type="supporting" color="secondary">
@@ -213,7 +213,7 @@ export default function SettingsTemplate() {
 
             <Divider />
 
-            <Grid columns={{minWidth: 320}} gap={10}>
+            <Grid columns={{minWidth: 320, max: 3}} gap={10}>
               <VStack gap={1}>
                 <Heading level={3}>Advanced settings</Heading>
                 <Text type="supporting" color="secondary">
