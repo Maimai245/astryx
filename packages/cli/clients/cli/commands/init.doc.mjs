@@ -114,7 +114,7 @@ export const doc = {
     {label: 'The skill in the project skills folders', cli: 'astryx init --to skills'},
     {label: 'Agent text for the whole computer', cli: 'astryx init --to user'},
     {label: 'A copy in a folder, saved nowhere', cli: 'astryx init --to ./bundle --once'},
-    {label: 'Remove the skill from every saved place', cli: 'astryx init --remove'},
+    {label: "Remove the skill from the project's saved places", cli: 'astryx init --remove'},
     {label: 'Remove the computer-level agent text and turn it off', cli: 'astryx init --remove --to user'},
   ],
   outsideProject: 'own',
