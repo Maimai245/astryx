@@ -91,6 +91,26 @@ describe('the skill-places check', () => {
     expect(result?.message).toContain('saves both');
   });
 
+  it('calls a deleted copy beside an edited one a split place, not a missing file init would write', async () => {
+    await init({to: 'skills'}, {cwd: project});
+    fs.appendFileSync(path.join(project, SHARED), 'my note\n');
+    fs.rmSync(path.join(project, '.claude', 'skills', 'astryx-project', 'SKILL.md'));
+    const result = await check('skill-places');
+    expect(result?.message).toContain('copies of skills differ');
+    expect(result?.message).toContain('missing');
+  });
+
+  it('counts a saved project folder beside the block as the guidance twice', async () => {
+    await init({}, {cwd: project});
+    const block = fs.readFileSync(path.join(project, 'AGENTS.md'), 'utf8');
+    await init({to: './team'}, {cwd: project});
+    // A stray block left beside the saved folder place.
+    fs.writeFileSync(path.join(project, 'AGENTS.md'), block);
+    const result = await check('skill-places');
+    expect(result).toMatchObject({status: 'warn'});
+    expect(result?.message).toContain('team/astryx-project/SKILL.md');
+  });
+
   it('warns when the two copies of a place differ', async () => {
     await init({to: 'skills'}, {cwd: project});
     fs.appendFileSync(path.join(project, SHARED), 'my note\n');
@@ -102,7 +122,13 @@ describe('the skill-places check', () => {
   it('never calls the computer-level skill a project skill in a project at the home folder', async () => {
     const home = /** @type {string} */ (process.env.HOME);
     await init({user: true}, {cwd: project});
-    fs.writeFileSync(path.join(home, 'package.json'), JSON.stringify({name: 'home'}));
+    fs.writeFileSync(
+      path.join(home, 'package.json'),
+      JSON.stringify({name: 'home', dependencies: {'@astryxdesign/core': '*'}}),
+    );
+    const core = path.join(home, 'node_modules', '@astryxdesign', 'core');
+    fs.mkdirSync(core, {recursive: true});
+    fs.writeFileSync(path.join(core, 'package.json'), JSON.stringify({name: '@astryxdesign/core', version: '0.0.15'}));
     const report = await runChecks({cwd: home});
     expect(report.checks.find(each => each.id === 'skill-places')).toBeUndefined();
   });

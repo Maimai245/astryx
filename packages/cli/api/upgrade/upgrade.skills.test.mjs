@@ -110,15 +110,30 @@ describe('upgrade and the skills place', () => {
     expect(lines.join('\n')).toContain(`[skip] Astryx skill: ${CLAUDE} kept: the other copy`);
   });
 
-  it('writes nothing through a skills folder linked out of the project', async () => {
+  it('writes nothing through a skills folder linked out of the project, and says error', async () => {
     save('skills');
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'astryx-upgrade-skills-out-'));
     try {
       fs.symlinkSync(outside, path.join(dir, '.claude'), 'dir');
+      // A stale block beside it is refreshed, and the result still says error.
+      write('AGENTS.md', `# Doc\n\n${generateCompressedIndex('0.0.1')}\n`);
       const res = await upgrade({from: '0.0.15', apply: true}, {cwd: dir});
       expect(res.data.agentDocs.action).toBe('error');
+      expect(read('AGENTS.md')).toMatch(/Astryx v0\.0\.15 ·/u);
       expect(fs.readdirSync(outside)).toEqual([]);
       expect(fs.existsSync(path.join(dir, SHARED))).toBe(false);
+    } finally {
+      fs.rmSync(outside, {recursive: true, force: true});
+    }
+  });
+
+  it('a skill-only project whose place is refused reads as stale and error', async () => {
+    save('skills');
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'astryx-upgrade-skills-out-'));
+    try {
+      fs.symlinkSync(outside, path.join(dir, '.claude'), 'dir');
+      const res = await upgrade({from: '0.0.15'}, {cwd: dir});
+      expect(res.data.agentDocs).toMatchObject({status: 'stale', action: 'error'});
     } finally {
       fs.rmSync(outside, {recursive: true, force: true});
     }

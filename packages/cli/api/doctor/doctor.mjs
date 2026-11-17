@@ -127,7 +127,6 @@ import {
   isLocalThemeOwner,
   readThemeState,
   builtTargetOf,
-  savedProjectSkillFiles,
   readSkillPlaces,
 } from './_adapter.mjs';
 import {checkBuilt} from './built-checks.mjs';
@@ -165,9 +164,6 @@ import {
  * @property {string|null} [projectCore] - The Core release the project names
  *   (installed, else locked, else declared), as the daily hint reads it.
  * @property {string|null} configPath - Resolved astryx.config.mjs path, or null.
- * @property {Array<{file: string, state: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileState}> | null} [projectSkillFiles]
- *   The project skill files and their states, when astryx.config `skills.to`
- *   saves no `agents-md` place; null otherwise.
  * @property {import('./_adapter.mjs').SkillPlacesReport|null} [skillPlaces]
  *   The project's skill places, or null when they could not be read.
  * @property {import('../../foundation/integrations/integrations.mjs').LoadedIntegration[]|null} [integrations]
@@ -878,40 +874,18 @@ export function checkAgentDocs(ctx) {
       : initFix;
 
   // A project that keeps its Astryx guidance as a skill (astryx.config
-  // `skills.to` without `agents-md`) is judged by its skill files; its agent
-  // files are its own text.
-  const skillFiles = ctx.projectSkillFiles;
-  if (skillFiles) {
-    const current = skillFiles.filter(each => each.state === 'current');
-    const stale = skillFiles.filter(each => each.state === 'differs');
-    const kept = skillFiles.filter(each => each.state === 'edited' || each.state === 'foreign');
-    const list = (/** @type {typeof skillFiles} */ files) => files.map(each => shown(each.file)).join(', ');
-    const keptNote = kept.length > 0 ? ` Kept as they are (edited, or not written by Astryx): ${list(kept)}.` : '';
-    if (stale.length === 0 && current.length > 0) {
-      return {
-        id: 'agent-docs',
-        label: 'AI agent docs',
-        status: 'pass',
-        message: `The Astryx skill matches this release in ${list(current)} (astryx.config skills.to).${keptNote}`,
-      };
-    }
-    if (stale.length === 0 && kept.length > 0) {
-      return {
-        id: 'agent-docs',
-        label: 'AI agent docs',
-        status: 'info',
-        message: `The project keeps its Astryx guidance as a skill (astryx.config skills.to).${keptNote}`,
-      };
-    }
+  // `skills.to` without `agents-md`): its agent files are its own text, and
+  // the skill-places check judges its skill files.
+  const places = ctx.skillPlaces?.places ?? ['agents-md'];
+  if (ctx.skillPlaces && !places.includes('agents-md')) {
+    const astryx = ctx.skillPlaces.files.filter(
+      file => file.state === 'current' || file.state === 'differs' || file.state === 'edited',
+    );
     return {
       id: 'agent-docs',
       label: 'AI agent docs',
-      status: 'warn',
-      message:
-        stale.length > 0
-          ? `The Astryx skill is from another release in ${list(stale)}.${keptNote}`
-          : 'The project saves its Astryx guidance as a skill (astryx.config skills.to), and no skill file is there.',
-      fix: fixFor(`Run \`${getCliInvocation(ctx.cwd)} init\` to write the saved places.`),
+      status: astryx.length > 0 ? 'pass' : 'info',
+      message: `The project keeps its Astryx guidance as a skill (astryx.config skills.to: ${places.join(', ')})${astryx.length > 0 ? `, in ${astryx.map(file => file.path).join(', ')}` : ''}; the skill-places check reports whether each file is there and current.`,
     };
   }
   if (present.length === 0) {
@@ -1050,7 +1024,7 @@ export function checkSkillPlaces(ctx) {
     const states = report.files.filter(file => file.place === place).map(file => file.state);
     return (
       states.some(state => state === 'edited' || state === 'foreign') &&
-      states.some(state => state === 'current' || state === 'differs')
+      states.some(state => state === 'current' || state === 'differs' || state === 'absent')
     );
   });
   if (split.length > 0) {
@@ -1058,7 +1032,7 @@ export function checkSkillPlaces(ctx) {
     return {
       ...base,
       status: 'warn',
-      message: `The copies of ${split.join(', ')} differ: ${files.map(file => `${file.path} (${file.state === 'edited' ? 'edited' : file.state === 'foreign' ? 'not written by Astryx' : 'Astryx\'s'})`).join(', ')}, so agents read different texts.`,
+      message: `The copies of ${split.join(', ')} differ: ${files.map(file => `${file.path} (${file.state === 'edited' ? 'edited' : file.state === 'foreign' ? 'not written by Astryx' : file.state === 'absent' ? 'missing' : 'Astryx\'s'})`).join(', ')}, so agents read different texts.`,
       fix: 'Make the copies the same: copy your file over the other, or delete both and run ' + init('') + '.',
     };
   }
@@ -2803,7 +2777,6 @@ export async function runChecks(options = {}) {
     cwd,
     nodeVersion: process.versions.node,
     coreDir,
-    projectSkillFiles: await savedProjectSkillFiles(cwd),
     skillPlaces,
     ownCli: projectHasOwnCli(cwd),
     projectCore: projectCoreVersion(cwd),

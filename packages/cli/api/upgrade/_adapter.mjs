@@ -488,6 +488,9 @@ export async function runPostCodemodHooks(hooks, context) {
  * @property {import('./upgrade.type.mjs').AgentDocsSummary} summary
  * @property {string} [blockAction] what the AGENTS.md block alone needs,
  *   before the skill places add to `summary.action`
+ * @property {boolean} [skillsRefused] the saved skill places cannot be
+ *   refreshed (a place linked out of the project, or a project at the home
+ *   folder), so the result is `error` whatever the block refresh does
  * @property {boolean} [noBlock] the project saves no `agents-md` place and
  *   has no block, so its skill files give the status
  * @property {{text: string, writes: Array<{place: import('../../foundation/agent-docs/skill-places.mjs').SkillPlace, rows: Map<string, import('./upgrade.type.mjs').UpgradeSkillFile>}>} | null} [skills]
@@ -561,6 +564,20 @@ export async function prepareAgentDocsRefresh({
 }
 
 /**
+ * Record that the saved skill places cannot be refreshed: the result says
+ * `error` however the block refresh goes (applyAgentDocsRefresh), and a
+ * project that keeps its guidance as a skill reads as `stale`.
+ * @param {AgentDocsRefreshPlan} plan
+ * @param {string} reason the line that says why
+ */
+function refuseSkillRefresh(plan, reason) {
+  plan.skillsRefused = true;
+  plan.summary.action = 'error';
+  if (plan.noBlock) plan.summary.status = 'stale';
+  logger.warn(reason);
+}
+
+/**
  * Plan the refresh of the saved skill places: each file this release's
  * project skill would create or update, and each it keeps (edited, or not
  * Astryx's). A file is written only by `--apply`.
@@ -587,15 +604,13 @@ async function prepareSkillRefresh(plan, skillPlaces, {installedVersion, apply, 
     assertAgentDocsTarget(cwd);
   } catch (err) {
     if (!(err instanceof AgentDocsHomeError)) throw err;
-    summary.action = 'error';
-    logger.warn(homeRefusalLine(err, 'stale'));
+    refuseSkillRefresh(plan, homeRefusalLine(err, 'stale'));
     return;
   }
   for (const place of skillPlaces) {
     const escape = skillPlaceEscape(place, cwd);
     if (escape) {
-      summary.action = 'error';
-      logger.warn(`Did not refresh the Astryx skill: ${escape}`);
+      refuseSkillRefresh(plan, `Did not refresh the Astryx skill: ${escape}`);
       return;
     }
   }
@@ -765,6 +780,7 @@ async function prepareBlockRefresh({
 export function applyAgentDocsRefresh(plan) {
   const summary = applyBlockRefresh(plan);
   applySkillRefresh(plan);
+  if (plan.skillsRefused) summary.action = 'error';
   return summary;
 }
 

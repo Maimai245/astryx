@@ -1028,29 +1028,6 @@ export async function fontPackagesInstallLine(projectDir, families) {
   };
 }
 
-/**
- * The project's skill files and each one's state against this release's
- * project skill, when the project's astryx.config `skills.to` saves no
- * `agents-md` place; null otherwise (the block is the project's place).
- * @param {string} cwd
- * @returns {Promise<Array<{file: string, state: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileState}> | null>}
- */
-export async function savedProjectSkillFiles(cwd) {
-  const root = resolveAgentDocsRoot(cwd);
-  if (root == null) return null;
-  const places = await readProjectPlaces(root);
-  if (places.some(place => place.kind === 'agents-md')) return null;
-  let text = '';
-  try {
-    text = renderProjectSkill(await renderAgentDocsBlock(root));
-  } catch {
-    // The agent-docs check reports a block that cannot render; every Astryx
-    // file then reads as from another release.
-  }
-  return places.flatMap(place =>
-    placeSkillFiles(place, root).map(file => ({file, state: managedFileState(file, text)})),
-  );
-}
 
 /**
  * What doctor reads about the project's skill places.
@@ -1115,9 +1092,18 @@ export async function readSkillPlaces(cwd) {
   const blockFiles = AGENT_DOC_PATHS.map(rel => path.join(root, rel))
     .filter(file => holdsAstryxBlock(read(file) ?? ''))
     .map(shown);
-  const skillFiles = (atHome ? [] : PROJECT_SKILL_FOLDERS).map(folder =>
-    path.join(root, folder, PROJECT_SKILL_NAME, 'SKILL.md'),
-  )
+  // Every project skill copy that is there: the project skills folders and
+  // the folder places saved in the project.
+  const skillFiles = [
+    ...new Set([
+      ...(atHome ? [] : PROJECT_SKILL_FOLDERS).map(folder =>
+        path.join(root, folder, PROJECT_SKILL_NAME, 'SKILL.md'),
+      ),
+      ...skillPlaces
+        .filter(place => place.kind === 'folder')
+        .flatMap(place => placeSkillFiles(place, root)),
+    ]),
+  ]
     .filter(file => read(file) != null)
     .map(shown);
   const plainNamed = (atHome ? [] : PROJECT_SKILL_FOLDERS).map(folder =>
