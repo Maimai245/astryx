@@ -27,7 +27,10 @@ import {
   renderComputerAgentText,
   writeComputerAgentText,
 } from '../agent-docs/computer-agent-text.mjs';
-import {writeManagedFile} from '../agent-docs/managed-skill-file.mjs';
+import {
+  managedFileState,
+  writeManagedFile,
+} from '../agent-docs/managed-skill-file.mjs';
 import {savedComputerFolderSkillFile} from '../agent-docs/skill-places.mjs';
 import {
   computerAgentTextSettings,
@@ -52,7 +55,8 @@ if (stateDir) {
     // The folders `astryx init --to <folder>` saved outside any project get
     // the same text, under the same rules: an edited file is kept. Each is
     // its own choice, so turning the computer-level text off leaves them
-    // (spec AST-081 FR8); `init --remove --to <folder>` forgets one.
+    // (spec AST-081 FR8). A deleted copy is the person's choice too: it is
+    // refreshed only while it is there.
     if (folders.length > 0) {
       const text = renderComputerAgentText({
         command: COMPUTER_COMMAND,
@@ -60,7 +64,8 @@ if (stateDir) {
       });
       for (const folder of folders) {
         try {
-          writeManagedFile(savedComputerFolderSkillFile(folder), text);
+          const file = savedComputerFolderSkillFile(folder);
+          if (managedFileState(file, text) !== 'absent') writeManagedFile(file, text);
         } catch {
           // A folder that cannot be written now is tried on the next release.
         }

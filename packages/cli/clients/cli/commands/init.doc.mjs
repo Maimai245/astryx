@@ -60,7 +60,7 @@ export const doc = {
       description:
         'Where the Astryx skill goes, a comma list: agents-md (the AGENTS.md block, the default), skills (.agents/skills/astryx-project and .claude/skills/astryx-project in the project), ' +
         'user (this computer, same as --user), or a folder written as a path (./team-skills, ~/team-skills). The choice is saved: in astryx.config `skills.to` for the project, so a later init writes the same places; ' +
-        'in the settings file for a folder outside it, which the CLI installed for the computer refreshes after each of its upgrades. Moving a project off a place removes the skill there. ' +
+        'in the settings file for a folder outside it, whose copy the CLI installed for the computer refreshes after each of its upgrades while it is there. Moving a project off a place removes the skill there. ' +
         'An unknown place exits 1 with ERR_INVALID_ARGUMENT',
     },
     {

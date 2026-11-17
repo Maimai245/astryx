@@ -205,6 +205,16 @@ describe('init --to skills', () => {
     expect(data.docsChanges.filter(c => c.change === 'removed')).toEqual([]);
   });
 
+  it('keeps the old skill place when the new folder place is a person\'s own', async () => {
+    await run({to: 'skills'});
+    const own = path.join(project, 'team', 'astryx-project', 'SKILL.md');
+    fs.mkdirSync(path.dirname(own), {recursive: true});
+    fs.writeFileSync(own, '# mine\n');
+    await run({to: './team'});
+    expect(exists(SHARED)).toBe(true);
+    expect(fs.readFileSync(own, 'utf8')).toBe('# mine\n');
+  });
+
   it('keeps a skill file a person edited, and one Astryx did not write', async () => {
     await run({to: 'skills'});
     fs.appendFileSync(path.join(project, SHARED), 'my note\n');
@@ -424,6 +434,48 @@ describe('refusals that keep every file where it is', () => {
     expect(err.code).toBe(ERROR_CODES.ERR_UNKNOWN_FEATURE);
     const both = await refusal(() => init({to: 'skills', features: 'agents', all: true}, {cwd: project}));
     expect(both.code).toBe(ERROR_CODES.ERR_INVALID_ARGUMENT);
+  });
+});
+
+describe('option pairs that compose with --to', () => {
+  it('--to agents-md --agent claude writes the Claude Code file', async () => {
+    const data = await run({to: 'agents-md', agent: 'claude'});
+    expect(data.docsWritten).toEqual(['.claude/CLAUDE.md']);
+    expect(exists('AGENTS.md')).toBe(false);
+  });
+
+  it('--to agents-md --agent-docs-path writes that file', async () => {
+    const data = await run({to: 'agents-md', agentDocsPath: 'docs/AI.md'});
+    expect(data.docsWritten).toEqual(['docs/AI.md']);
+    expect(read('docs/AI.md')).toContain(MARKER_START);
+  });
+
+  it('--to skills --all writes the skill and runs every feature', async () => {
+    const data = await run({to: 'skills', all: true});
+    expect(data.features).toEqual(['agents', 'theme', 'template']);
+    expect(exists(SHARED)).toBe(true);
+    expect(data.themeTemplate).toBe('created');
+    expect(exists('AGENTS.md')).toBe(false);
+  });
+
+  it('--to skills --features agents,theme writes the skill and the theme template', async () => {
+    const data = await run({to: 'skills', features: 'agents,theme'});
+    expect(data.features).toEqual(['agents', 'theme']);
+    expect(exists(SHARED)).toBe(true);
+    expect(data.themeTemplate).toBe('created');
+  });
+});
+
+describe('a project root in a settings folder of the home folder', () => {
+  it('takes no project place: nothing is saved or written there, as plain init', async () => {
+    const settingsDir = path.join(home, '.claude');
+    fs.mkdirSync(settingsDir, {recursive: true});
+    fs.writeFileSync(path.join(settingsDir, 'package.json'), JSON.stringify({name: 'claude-settings'}));
+    const data = await run({to: './skills'}, settingsDir);
+    expect(data.docsError?.kind).toBe('install-failed');
+    expect(fs.readdirSync(settingsDir)).toEqual(['package.json']);
+    const plain = await run({}, settingsDir);
+    expect(plain.docsError?.kind).toBe('install-failed');
   });
 });
 

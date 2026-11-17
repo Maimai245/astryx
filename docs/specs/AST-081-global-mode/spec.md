@@ -518,8 +518,9 @@ works on is `spec:AST-040` FR9's.
     writes none of these files, until `astryx init --user` runs again. A
     folder a person saved with `astryx init --to <folder>` is a choice of its
     own: the global copy refreshes `<folder>/astryx/SKILL.md` on the same
-    schedule, an edited file kept, until `astryx init --remove --to <folder>`
-    removes it.
+    schedule while the file is there, an edited file kept, and never writes
+    it again once it is deleted; `astryx init --to <folder>` writes it
+    again.
   - The settings file is `astryx/settings.json` in the per-user configuration
     directory (FR7): `computerAgentText.install`, `true` or `false`, and
     `computerAgentText.links`, the links the CLI made, so removal removes

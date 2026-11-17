@@ -356,6 +356,20 @@ async function applyPlaces(cwd, options, invocation, data, given) {
     previous && projectRoot && projectPlaces.length > 0
       ? previous.filter(place => !kept.has(savedName(place)))
       : [];
+  // A project root in the home folder, or in a settings folder in it (such
+  // as `~/.claude` holding a package.json), takes no project place, as it
+  // takes no agent docs (architecture:cli-surface INV31): nothing in it is
+  // saved or written. The computer places still are.
+  if (projectRoot && projectPlaces.length > 0) {
+    try {
+      assertAgentDocsTarget(projectRoot);
+    } catch (err) {
+      if (!(err instanceof AgentDocsHomeError)) throw err;
+      logger.warn(`Note: ${err.message}`);
+      data.docsError = {kind: 'install-failed', message: err.message};
+      return applyComputerPlaces(places, data, record);
+    }
+  }
   // Everything that can stop the run comes before any change: each project
   // skill file stays inside the project (a skills folder linked out of it,
   // such as `.claude` linked to `~/.claude`, is refused), the skill renders,
@@ -385,17 +399,18 @@ async function applyPlaces(cwd, options, invocation, data, given) {
       record(place, rows);
     }
   }
+  // The old places are cleared only when a new one holds the guidance: when
+  // every new place is a person's own file, the old ones stay, so the project
+  // never ends with no Astryx text.
   const blockStays = projectPlaces.some(place => place.kind === 'agents-md');
-  for (const place of leaving) {
+  if (leaving.length > 0 && !blockStays && !landed) {
+    logger.warn(
+      `Note: Kept the Astryx guidance in ${leaving.map(savedName).join(', ')}: every new place holds a file Astryx did not write or one you edited, so nothing else holds it yet.`,
+    );
+  }
+  for (const place of blockStays || landed ? leaving : []) {
     if (place.kind !== 'agents-md') {
       record(place, removeSkillPlace(place, /** @type {string} */ (projectRoot)));
-      continue;
-    }
-    // The block is the only Astryx text left when every new place was kept.
-    if (!blockStays && !landed) {
-      logger.warn(
-        'Note: The Astryx block stays in the agent files: every new place holds a file Astryx did not write or one you edited, so nothing else holds the guidance yet.',
-      );
       continue;
     }
     const root = /** @type {string} */ (projectRoot);
@@ -412,6 +427,18 @@ async function applyPlaces(cwd, options, invocation, data, given) {
     }
   }
 
+  await applyComputerPlaces(places, data, record);
+
+}
+
+/**
+ * Write the computer places `--to` named: folders outside any project,
+ * saved in the settings file, and the computer-level skill.
+ * @param {import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace[]} places
+ * @param {import('../init.type.mjs').InitRunData} data
+ * @param {(place: import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace, rows: ReturnType<typeof writeSkillPlace>) => void} record
+ */
+async function applyComputerPlaces(places, data, record) {
   const computerFolders = places.filter(
     place => place.scope === 'computer' && place.kind === 'folder',
   );
