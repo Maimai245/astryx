@@ -47,7 +47,6 @@ import {
   computerSkillFolders,
 } from '../../foundation/env/user-settings.mjs';
 import {managedFileState} from '../../foundation/agent-docs/managed-skill-file.mjs';
-import * as os from 'node:os';
 import * as fs from 'node:fs';
 import {resolveAgentDocsRoot} from '../../foundation/agent-docs/agent-docs-target.mjs';
 import {
@@ -58,6 +57,7 @@ import {renderAgentDocsBlock} from '../../foundation/agent-docs/agent-docs.mjs';
 import {
   COMPUTER_SKILL_NAME,
   PROJECT_SKILL_FOLDERS,
+  savedComputerFolderSkillFile,
   PROJECT_SKILL_NAME,
   placeSkillFiles,
   renderProjectSkill,
@@ -646,13 +646,10 @@ export function computerAgentTextState() {
     command,
     install,
     // The folders outside any project `init --to <folder>` saved.
-    folders: computerSkillFolders().map(folder => {
-      const dir = folder.startsWith('~') ? path.join(os.homedir(), folder.slice(1)) : folder;
-      return {
-        path: folder,
-        state: managedFileState(path.join(dir, COMPUTER_SKILL_NAME, 'SKILL.md'), text),
-      };
-    }),
+    folders: computerSkillFolders().map(folder => ({
+      path: folder,
+      state: managedFileState(savedComputerFolderSkillFile(folder), text),
+    })),
   };
 }
 
