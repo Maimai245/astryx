@@ -81,9 +81,9 @@ describe('init --once', () => {
 
   it('moves the project off nothing', async () => {
     await init({}, {cwd: project});
-    await init({to: 'skills', once: true}, {cwd: project});
+    await init({to: './bundle', once: true}, {cwd: project});
     expect(exists('AGENTS.md')).toBe(true);
-    expect(exists(SHARED)).toBe(true);
+    expect(exists('bundle/astryx-project/SKILL.md')).toBe(true);
   });
 
   it.each([
@@ -91,10 +91,23 @@ describe('init --once', () => {
     [{to: 'user', once: true}, '--to user'],
     [{user: true, once: true}, '--user'],
     [{to: 'skills', once: true, remove: true}, '--once'],
+    [{to: 'agents-md', once: true}, 'agents-md'],
   ])('refuses %o', async (options, named) => {
     const err = await refusal(() => init(options, {cwd: project}));
     expect(err.code).toBe(ERROR_CODES.ERR_INVALID_ARGUMENT);
     expect(err.message).toContain(named);
+  });
+
+  it('refuses a place the project or this computer already saves, and writes nothing', async () => {
+    await init({to: 'skills'}, {cwd: project});
+    await init({to: '~/team-skills'}, {cwd: project});
+    const before = fs.readFileSync(path.join(project, SHARED), 'utf8');
+    for (const to of ['skills', '~/team-skills']) {
+      const err = await refusal(() => init({to, once: true}, {cwd: project}));
+      expect(err.code).toBe(ERROR_CODES.ERR_INVALID_ARGUMENT);
+      expect(err.message).toContain(to);
+    }
+    expect(fs.readFileSync(path.join(project, SHARED), 'utf8')).toBe(before);
   });
 });
 
@@ -147,6 +160,17 @@ describe('init --remove', () => {
     expect(res.type).toBe('init.user');
     expect(fs.existsSync(path.join(home, '.agents', 'skills', 'astryx', 'SKILL.md'))).toBe(false);
     expect(settings().computerAgentText.install).toBe(false);
+  });
+
+  it('never removes the computer-level skill through a folder its link points into', async () => {
+    await init({to: 'user'}, {cwd: project});
+    const skill = path.join(home, '.agents', 'skills', 'astryx', 'SKILL.md');
+    expect(fs.lstatSync(path.join(home, '.claude', 'skills', 'astryx')).isSymbolicLink()).toBe(true);
+    await init({to: '~/.claude/skills'}, {cwd: project});
+    const res = await init({remove: true, to: '~/.claude/skills'}, {cwd: project});
+    if (res.type !== 'init.remove') throw new Error(res.type);
+    expect(res.data.skills[0]).toMatchObject({action: 'kept', reason: 'not-astryx'});
+    expect(fs.existsSync(skill)).toBe(true);
   });
 
   it('keeps an edited skill file and says so', async () => {

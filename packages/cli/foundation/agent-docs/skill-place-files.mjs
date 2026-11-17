@@ -50,6 +50,33 @@ export async function readProjectPlaces(projectRoot) {
 }
 
 /**
+ * Whether the skill folder holding `file` is a link. The computer-level
+ * skill is linked into other agents' skill folders (`~/.claude/skills/astryx`
+ * links to `~/.agents/skills/astryx`), so a file reached through such a link
+ * belongs to another place and is never written or removed through this one.
+ * @param {string} file
+ * @returns {boolean}
+ */
+function linkedSkillFolder(file) {
+  try {
+    return fs.lstatSync(path.dirname(file)).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A skill file's state, a file reached through a linked skill folder being
+ * one Astryx did not write for this place.
+ * @param {string} file
+ * @param {string} text
+ * @returns {import('./managed-skill-file.mjs').ManagedFileState}
+ */
+function placeFileState(file, text) {
+  return linkedSkillFolder(file) ? 'foreign' : managedFileState(file, text);
+}
+
+/**
  * Write `text` to each skill file of `place`. The copies of one place are
  * written together or not at all: when any is a person's own (edited, or not
  * Astryx's), each is kept, so every agent reads one text.
@@ -60,7 +87,7 @@ export async function readProjectPlaces(projectRoot) {
  */
 export function writeSkillPlace(place, projectRoot, text) {
   const files = placeSkillFiles(place, projectRoot);
-  const states = files.map(file => ({file, state: managedFileState(file, text)}));
+  const states = files.map(file => ({file, state: placeFileState(file, text)}));
   const owned = (/** @type {string} */ state) => state === 'edited' || state === 'foreign';
   if (files.length > 1 && states.some(each => owned(each.state))) {
     return states.map(({file, state}) => ({
@@ -69,7 +96,11 @@ export function writeSkillPlace(place, projectRoot, text) {
       reason: owned(state) ? keptReason(/** @type {'edited' | 'foreign'} */ (state)) : /** @type {const} */ ('pair-kept'),
     }));
   }
-  return files.map(file => ({file, ...writeManagedFile(file, text)}));
+  return files.map(file =>
+    linkedSkillFolder(file)
+      ? {file, action: /** @type {const} */ ('kept'), reason: /** @type {const} */ ('not-astryx')}
+      : {file, ...writeManagedFile(file, text)},
+  );
 }
 
 /**
@@ -91,6 +122,9 @@ export function removeSkillPlace(place, projectRoot) {
         ? projectRoot
         : path.dirname(place.dir);
   return placeSkillFiles(place, projectRoot).map(file => {
+    if (linkedSkillFolder(file)) {
+      return {file, action: /** @type {const} */ ('kept'), reason: /** @type {const} */ ('not-astryx')};
+    }
     const result = removeManagedFileIfOwned(file);
     if (result.action === 'removed' && stop)
       removeEmptyFolders(path.dirname(file), stop);
@@ -149,7 +183,7 @@ export function skillPlaceEscape(place, projectRoot) {
 export function inspectSkillPlace(place, projectRoot, text) {
   return placeSkillFiles(place, projectRoot).map(file => ({
     file,
-    state: managedFileState(file, text),
+    state: placeFileState(file, text),
   }));
 }
 

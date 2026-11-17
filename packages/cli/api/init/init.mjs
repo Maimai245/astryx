@@ -29,7 +29,12 @@ import {
   parsePlaces,
   placeNames,
 } from '../../foundation/agent-docs/skill-places.mjs';
-import {readProjectPlaces, skillProjectRoot} from './_adapter.mjs';
+import {savedName} from '../../foundation/agent-docs/skill-places.mjs';
+import {
+  computerSkillFoldersSaved,
+  readProjectPlaces,
+  skillProjectRoot,
+} from './_adapter.mjs';
 
 export {getNextSteps, getWorkflowSteps} from './run/run.mjs';
 
@@ -186,7 +191,25 @@ async function initTo(options, cwd) {
       ERROR_CODES.ERR_INVALID_ARGUMENT,
     );
   }
-  // A one-off copy moves the project off nothing and saves nothing.
+  // A one-off copy moves the project off nothing and saves nothing, so it
+  // goes only to a place nothing keeps current: never the block, and never
+  // a place a project or this computer already saves.
+  if (options.once) {
+    const saved = new Set([
+      ...(projectRoot ? (await readProjectPlaces(projectRoot)).map(savedName) : []),
+      ...computerSkillFoldersSaved(),
+    ]);
+    const kept = places
+      .filter(place => place.kind === 'agents-md' || saved.has(savedName(place)))
+      .map(savedName);
+    if (kept.length > 0) {
+      throw new AstryxError(
+        `\`--once\` writes a copy nothing keeps current, and ${kept.join(', ')} ${kept.length === 1 ? 'is' : 'are'} kept current (the AGENTS.md block, or a saved place): name another folder, or leave \`--once\` out.`,
+        undefined,
+        ERROR_CODES.ERR_INVALID_ARGUMENT,
+      );
+    }
+  }
   const previous = projectRoot && !options.once ? await readProjectPlaces(projectRoot) : null;
   return run(options, {
     cwd,

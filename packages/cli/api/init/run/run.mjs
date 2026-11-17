@@ -37,9 +37,9 @@ import {
   removeSkillPlace,
   resolveAgentPaths,
   saveProjectPlaces,
+  skillReceiptRow,
   writeSkillPlace,
 } from '../_adapter.mjs';
-import {keptText} from '../../../foundation/agent-docs/skill-place-files.mjs';
 import {savedName} from '../../../foundation/agent-docs/skill-places.mjs';
 import {computerAgentCommand} from '../../../foundation/agent-docs/computer-agent-text.mjs';
 import {user} from '../user/user.mjs';
@@ -279,19 +279,6 @@ async function applyAgents(cwd, options, invocation, data) {
 
 
 /**
- * One receipt line for one skill file.
- * @param {import('../init.type.mjs').InitSkillFile} row
- * @returns {string}
- */
-function skillLine({path: shown, action, reason}) {
-  if (action === 'kept')
-    return `[skip] Astryx skill: ${shown} ${keptText(reason, 'delete it to get the current text')}`;
-  if (action === 'unchanged')
-    return `[ok] Astryx skill: ${shown} already current, nothing changed`;
-  return `[ok] Astryx skill: ${shown} ${action}`;
-}
-
-/**
  * The places this run writes: the ones `--to` named, else the project's
  * saved places, else the AGENTS.md block.
  * @param {string} cwd
@@ -337,16 +324,10 @@ async function applyPlaces(cwd, options, invocation, data, given) {
     /** @type {ReturnType<typeof writeSkillPlace>} */ rows,
   ) => {
     for (const row of rows) {
-      if (row.action === 'absent') continue;
-      /** @type {import('../init.type.mjs').InitSkillFile} */
-      const entry = {
-        path: shown(row.file),
-        place: savedName(place),
-        action: row.action,
-      };
-      if (row.reason) entry.reason = row.reason;
-      data.skills.push(entry);
-      logger.log(skillLine(entry));
+      const receipt = skillReceiptRow(place, row, shown, 'delete it to get the current text');
+      if (!receipt) continue;
+      data.skills.push(receipt.entry);
+      logger.log(receipt.line);
     }
   };
   const projectPlaces = places.filter(place => place.scope === 'project');

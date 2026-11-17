@@ -28,15 +28,11 @@ import {
   removeSkillPlace,
   saveProjectPlaces,
   skillProjectRoot,
+  skillReceiptRow,
 } from '../_adapter.mjs';
 import {user} from '../user/user.mjs';
 import {logger} from '../../logger.mjs';
 
-/** @type {Record<string, string>} */
-const SKILL_KEPT = {
-  edited: 'kept, edited since Astryx wrote it; delete it by hand',
-  'not-astryx': 'kept, not created by Astryx',
-};
 
 /**
  * Remove the Astryx skill and return an `init.remove` receipt. Progress is
@@ -103,20 +99,10 @@ export async function remove({cwd = process.cwd(), places, projectRoot} = {}) {
   for (const place of targets) {
     if (place.kind !== 'skills' && place.kind !== 'folder') continue;
     for (const row of removeSkillPlace(place, root)) {
-      if (row.action === 'absent') continue;
-      /** @type {import('../init.type.mjs').InitSkillFile} */
-      const entry = {
-        path: shown(row.file),
-        place: savedName(place),
-        action: row.action === 'removed' ? 'removed' : 'kept',
-      };
-      if (row.reason) entry.reason = row.reason;
-      data.skills.push(entry);
-      logger.log(
-        entry.action === 'removed'
-          ? `[ok] Astryx skill: ${entry.path} removed`
-          : `[skip] Astryx skill: ${entry.path} ${SKILL_KEPT[entry.reason ?? 'not-astryx']}`,
-      );
+      const receipt = skillReceiptRow(place, row, shown, 'delete it by hand');
+      if (!receipt) continue;
+      data.skills.push(receipt.entry);
+      logger.log(receipt.line);
     }
   }
   dropComputerSkillFolders(

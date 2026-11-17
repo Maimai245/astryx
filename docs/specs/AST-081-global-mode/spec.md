@@ -482,6 +482,14 @@ works on is `spec:AST-040` FR9's.
     place that differ, the block and the skill both present without both
     being saved, and a project skill named `astryx`, and scans no skill
     folder in the home folder or a settings folder.
+    `astryx init --to <places> --once` writes a copy saved nowhere, so no
+    later run touches it, and refuses the block and any place already
+    saved. `astryx init --remove` (`--remove-agents` is the same option)
+    removes the skill from every place the project saves, or with `--to`
+    from the places named, drops each from what is saved, and removes the
+    block when no `--to` is given or `--to` names `agents-md`; folders saved
+    for this computer stay unless `--to` names them. Neither writes nor
+    removes a skill file reached through a linked skill folder.
 
   No run writes a project's agent docs into the home folder or a settings folder
   in it (`architecture:cli-surface` INV31); the computer-level agent text above

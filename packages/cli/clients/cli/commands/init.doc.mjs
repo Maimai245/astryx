@@ -67,7 +67,7 @@ export const doc = {
       flag: '--once',
       param: 'options.once',
       description:
-        'With --to, write a copy that is saved nowhere, so init, upgrade and doctor never touch it again (a bundle, a skill to upload). Refused without --to, and with user',
+        'With --to, write a copy that is saved nowhere, so init, upgrade and doctor never touch it again (a bundle, a skill to upload). Refused without --to, with user, and for agents-md or a place already saved',
     },
     {
       flag: '--remove',
