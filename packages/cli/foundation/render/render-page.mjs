@@ -1003,8 +1003,12 @@ const SCHEME_CSS =
  */
 export async function renderPage(entry, options = {}) {
   const dir = path.dirname(entry);
+  // The project's folder, else the page's: where its tsconfig.json is read
+  // and paths in messages start.
+  const root = projectOf(dir) ?? dir;
   const scope = carryScopeOf(dir, options.cwd);
-  const root = siteRootOf(dir, scope);
+  // Where a `/` path's public/ folder is.
+  const site = siteRootOf(dir, scope);
   const served = options.served ?? null;
   /** @type {RenderWarning[]} */
   const warnings = [];
@@ -1092,7 +1096,7 @@ export async function renderPage(entry, options = {}) {
 
   const ctx = {
     dir,
-    root,
+    root: site,
     warnings,
     counted: new Set(),
     localAssets: /** @type {Set<string>} */ (new Set()),
