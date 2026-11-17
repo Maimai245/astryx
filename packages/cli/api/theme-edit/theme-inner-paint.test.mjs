@@ -63,14 +63,19 @@ describe('a paint drawn inside a part', () => {
   it('refuses the property on the part and offers the token', async ctx => {
     if (needBases(ctx)) return;
     await themeEditNew('i', {cwd, like: 'neutral'});
-    const kbd = await refusal(() =>
-      themeEditSet('i', 'background-color', '#888888', {cwd, on: 'kbd'}),
-    );
-    expect(kbd.code).toBe('ERR_THEME_NO_EFFECT');
-    expect(kbd.message).toMatch(/kbd draws no box of its own: kbd-key/);
-    expect(kbd.run[0]).toMatch(
-      / set i background-color '#888888' --on kbd-key$/,
-    );
+    // Kbd's key badges paint each key's fill as a part of their own,
+    // kbd-key, which takes the property; a fill on the whole shortcut, and
+    // on a part whose inner parts paint their own (a paragraph's code), is
+    // the base's, and is taken too.
+    await themeEditSet('i', 'background-color', '#888888', {
+      cwd,
+      on: 'kbd-key',
+    });
+    await themeEditSet('i', 'background-color', '#999999', {cwd, on: 'kbd'});
+    await themeEditSet('i', 'background-color', '#f5f5f5', {
+      cwd,
+      on: 'markdown-paragraph',
+    });
     const item = await refusal(() =>
       themeEditSet('i', 'color', '#ff0000', {cwd, on: 'radio-list-item'}),
     );

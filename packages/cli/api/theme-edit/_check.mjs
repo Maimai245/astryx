@@ -5004,32 +5004,6 @@ function checkOne(
               .map(t => setLine(slug, t, v, {...s, only: undefined}, unset)),
           },
         );
-      // A group with no box of its own (no fill, border, shadow or
-      // padding) whose every part paints its own (a shortcut's key badges)
-      // shows a fill only in the gaps between them: the property belongs
-      // on those parts.
-      const boxless =
-        rec &&
-        !Object.keys(rec.own ?? {}).some(x =>
-          /^(background|border|box-shadow|outline|padding)/.test(x),
-        );
-      const kids = boxless ? (rec.contains ?? []) : [];
-      const painters =
-        kids.length && kids.every(k => props.some(x => ctx.C.MAP[k]?.own?.[x]))
-          ? kids
-          : [];
-      if (painters.length && !rec.media)
-        refuse(
-          E.ERR_THEME_NO_EFFECT,
-          `${s.on} draws no box of its own: ${painters.join(', ')} inside it paints its own ${prop}, so a ${prop} set on ${s.on} would show only in the gaps between them.`,
-          {
-            run: painters
-              .slice(0, 2)
-              .map(k =>
-                setLine(slug, prop, v, {...s, on: k, only: undefined}, unset),
-              ),
-          },
-        );
     }
   }
   // A part drawn under an invisible native input (a checkbox's box, a

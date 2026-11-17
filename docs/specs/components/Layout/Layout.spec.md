@@ -86,9 +86,10 @@ closed start or end slot gives the same FR6 composition as an omitted one
 - The Layout container, its `layout` target, and the five slot positions.
 - Height, the Layout-edge inset, content width, and the header and footer
   divider default that its region components read.
-- The container context, `LayoutContainerContext`: Card, Dialog, and
-  BottomSheet name themselves through it, and LayoutHeader and LayoutFooter
-  reflect the name as `container` (DEC-2).
+- The container context, `LayoutContainerContext`, and the
+  `LayoutContainerScope` client island Card provides it through: Card,
+  Dialog, and BottomSheet name themselves through it, and LayoutHeader and
+  LayoutFooter reflect the name as `container` (DEC-2).
 - The aggregate consumer document and theming map for the `layout`,
   `layout-header`, `layout-panel`, `layout-content`, and `layout-footer`
   targets.
@@ -245,6 +246,13 @@ reflect it as `data-container`, so a theme styles one container's header or
 footer without another's (`component:LayoutHeader` DEC-1,
 `component:LayoutFooter` DEC-1). The context is layer-scoped, so a menu or
 popover opened from inside a container starts with none.
+
+Card provides it through `LayoutContainerScope`
+(`Layout/LayoutContainerScope.tsx`), a client island that renders the
+provider and adds no element. Card is a server-safe component with no client
+directive, and a context provider is client-only, so Card renders the island
+instead of the provider (`component:Card` PR1). Dialog and BottomSheet are
+client components and provide the context directly.
 
 A separate context is needed because the container is not Layout's to know:
 Layout renders the same inside a card, a dialog, or a page, and only the
