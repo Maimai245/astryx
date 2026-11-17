@@ -29,6 +29,7 @@
  * --agent-docs-path <path>: explicit file path(s)
  */
 
+import {discoverIntegrationSkills} from '../discovery/integration-skills.mjs';
 import {spawnSync} from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -604,7 +605,7 @@ export function projectHasBuiltCheck(dir) {
  * `getting-started` is the one it should reach for first.
  *
  * @param {string | null} version the Core version
- * @param {{coreDir?: string|null, invocation?: string, stylingSystem?: 'stylex'|'tailwind'|'css', zh?: boolean, lang?: string, topics?: string[], agentDocs?: Array<{package: string, append: readonly string[]}>, builtCheck?: boolean}} [options]
+ * @param {{coreDir?: string|null, invocation?: string, stylingSystem?: 'stylex'|'tailwind'|'css', zh?: boolean, lang?: string, topics?: string[], agentDocs?: Array<{package: string, append: readonly string[]}>, skills?: ReadonlyArray<{package: string, name: string, description: string}>, builtCheck?: boolean}} [options]
  * @returns {string}
  */
 export function generateCompressedIndex(
@@ -615,6 +616,7 @@ export function generateCompressedIndex(
     stylingSystem = 'css',
     topics,
     agentDocs = [],
+    skills = [],
     builtCheck = false,
   } = {},
 ) {
@@ -736,7 +738,7 @@ export function generateCompressedIndex(
     (count, contribution) => count + contribution.append.length,
     0,
   );
-  if (appendCount > 0) {
+  if (appendCount > 0 || skills.length > 0) {
     lines.push('');
     lines.push('INTEGRATIONS:');
     for (const contribution of agentDocs) {
@@ -744,10 +746,23 @@ export function generateCompressedIndex(
         lines.push(`- \`${contribution.package}\`: ${line}`);
       }
     }
+    // One line per integration skill; its whole text is in the skill places
+    // and `astryx docs skills/<name>`.
+    for (const each of skills) lines.push(skillPointerLine(each));
   }
   lines.push(MARKER_END);
 
   return lines.join('\n');
+}
+
+/**
+ * The block's line for one integration skill: who ships it, when to use it,
+ * and the command that reads it.
+ * @param {{package: string, name: string, description: string}} skill
+ * @returns {string}
+ */
+export function skillPointerLine({package: pkg, name, description}) {
+  return `- \`${pkg}\` skill \`${name}\`: ${description} Read it with \`astryx docs skills/${name}\`.`;
 }
 
 /**
@@ -819,8 +834,14 @@ export async function renderAgentDocsBlock(
     ];
   });
 
+  const {skills} = await discoverIntegrationSkills(project.loadedIntegrations);
   return generateCompressedIndex(version, {
     coreDir,
+    skills: skills.map(({package: pkg, name, description}) => ({
+      package: validateIntegrationLabel(pkg),
+      name,
+      description,
+    })),
     builtCheck: projectHasBuiltCheck(targetDir),
     invocation: getCliInvocation(targetDir),
     stylingSystem: detectStylingSystem(targetDir),

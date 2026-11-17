@@ -19,6 +19,8 @@
 
 import * as path from 'node:path';
 import {Project} from '../../foundation/config/project.mjs';
+import {discoverIntegrationSkills} from '../../foundation/discovery/integration-skills.mjs';
+import {resolveAgentDocsRoot} from '../../foundation/agent-docs/agent-docs-target.mjs';
 import {
   DocsCatalog,
   integrationDocsCatalog,
@@ -2550,4 +2552,38 @@ export async function integrationDocTypes(integration, cwd) {
       ...unread.map(entry => ({doc: rel(entry.path), reason: entry.reason})),
     ].sort((a, b) => compareText(a.doc, b.doc)),
   };
+}
+
+/**
+ * The skills the project's integrations declare, each with the route `astryx
+ * docs` reads its doc by, and why each skill left out was left out.
+ * @param {string} cwd
+ * @returns {Promise<{skills: Array<import('../../foundation/discovery/integration-skills.mjs').IntegrationSkill & {route: string}>, problems: Array<{package: string, message: string}>}>}
+ */
+export async function projectIntegrationSkills(cwd) {
+  const catalog = await loadDocsCatalog(cwd);
+  const project = projectOfCatalog.get(catalog);
+  if (!project) return {skills: [], problems: []};
+  const {skills, problems} = await discoverIntegrationSkills(project.loadedIntegrations);
+  if (skills.length === 0) return {skills: [], problems};
+  const tree = await projectTree(catalog);
+  /** @type {Map<string, string>} */
+  const routes = new Map();
+  for (const node of tree.nodes.values()) {
+    const file = /** @type {any} */ (node.ref)?.topicFile;
+    if (typeof file === 'string') routes.set(file, node.route);
+  }
+  return {
+    skills: skills.map(each => ({...each, route: routes.get(each.file) ?? each.doc})),
+    problems,
+  };
+}
+
+/**
+ * The project root the project skill belongs to, or null outside a project.
+ * @param {string} cwd
+ * @returns {string | null}
+ */
+export function skillsProjectRoot(cwd) {
+  return resolveAgentDocsRoot(cwd);
 }

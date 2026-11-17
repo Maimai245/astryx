@@ -68,9 +68,12 @@ import {
   savedName,
 } from '../../foundation/agent-docs/skill-places.mjs';
 import {
+  inspectIntegrationSkill,
   inspectSkillPlace,
+  leftoverIntegrationSkills,
   readProjectPlaces,
 } from '../../foundation/agent-docs/skill-place-files.mjs';
+import {integrationSkillFiles} from '../docs/skills/skills.mjs';
 import {createRequire} from 'node:module';
 import {placeholderUses} from '../../foundation/discovery/template-icons.mjs';
 export {placeholderFixes} from '../../foundation/discovery/template-icons.mjs';
@@ -1033,8 +1036,10 @@ export async function fontPackagesInstallLine(projectDir, families) {
  * What doctor reads about the project's skill places.
  * @typedef {object} SkillPlacesReport
  * @property {string[]} places The saved places, as astryx.config saves them; `agents-md` when nothing is saved.
- * @property {Array<{path: string, place: string, state: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileState}>} files
- *   Each file of a saved `skills` or folder place against this release's project skill, relative to the folder doctor runs in.
+ * @property {Array<{path: string, place: string, skill?: string, state: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileState}>} files
+ *   Each file of a saved `skills` or folder place against this release's project skill, and each integration skill's (`skill`), relative to the folder doctor runs in.
+ * @property {Array<{package: string, message: string}>} skillProblems Why each skill an integration declares was left out.
+ * @property {string[]} leftovers Skill files Astryx wrote for an integration the project no longer has.
  * @property {string | null} renderError Why the project skill could not be rendered, when a skill place is saved and it could not.
  * @property {string[]} blockFiles The project's agent files that hold the Astryx block.
  * @property {string[]} skillFiles The project skill files present in the project skills folders, saved or not.
@@ -1076,17 +1081,41 @@ export async function readSkillPlaces(cwd) {
   const skillPlaces = places.filter(place => place.kind === 'skills' || place.kind === 'folder');
   /** @type {SkillPlacesReport['files']} */
   const files = [];
+  /** @type {SkillPlacesReport['skillProblems']} */
+  const skillProblems = [];
+  /** @type {string[]} */
+  const leftovers = [];
   let renderError = null;
   if (skillPlaces.length > 0) {
     try {
       const text = renderProjectSkill(await renderAgentDocsBlock(root));
+      const declared = await integrationSkillFiles(root);
+      skillProblems.push(...declared.problems);
+      const keep = new Set(declared.skills.map(each => each.name));
       for (const place of skillPlaces) {
         for (const {file, state} of inspectSkillPlace(place, root, text)) {
           files.push({path: shown(file), place: savedName(place), state});
         }
+        for (const each of declared.skills) {
+          for (const {file, state} of inspectIntegrationSkill(place, root, each)) {
+            files.push({path: shown(file), place: savedName(place), skill: each.name, state});
+          }
+        }
+        for (const file of leftoverIntegrationSkills(place, root, keep)) {
+          leftovers.push(shown(file));
+        }
       }
     } catch (err) {
       renderError = err instanceof Error ? err.message : String(err);
+    }
+  }
+  // A project that keeps only the block still loses a left-out skill's
+  // pointer line, so its problems are read either way.
+  if (skillPlaces.length === 0) {
+    try {
+      skillProblems.push(...(await integrationSkillFiles(root)).problems);
+    } catch {
+      // Unreadable integrations are the integration checks' to report.
     }
   }
   const blockFiles = AGENT_DOC_PATHS.map(rel => path.join(root, rel))
@@ -1115,6 +1144,8 @@ export async function readSkillPlaces(cwd) {
     places: atHome ? ['agents-md'] : places.map(savedName),
     files,
     renderError,
+    skillProblems,
+    leftovers,
     blockFiles,
     skillFiles,
     plainNamed,

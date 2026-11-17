@@ -18,7 +18,13 @@ import {findConfigPath} from '../config/config-path.mjs';
 import {PathSafetyError, assertWithin} from '../fs/path-safety.mjs';
 import {loadModuleWithParser} from '../fs/module-loader.mjs';
 import {parseConfig} from '../../authoring/config/parse.mjs';
-import {placeSkillFiles, savedProjectPlaces} from './skill-places.mjs';
+import {
+  COMPUTER_SKILL_NAME,
+  PROJECT_SKILL_NAME,
+  placeFolders,
+  placeSkillFiles,
+  savedProjectPlaces,
+} from './skill-places.mjs';
 import {
   keptReason,
   managedFileState,
@@ -121,7 +127,12 @@ export function removeSkillPlace(place, projectRoot) {
       : place.dir === projectRoot
         ? projectRoot
         : path.dirname(place.dir);
-  return placeSkillFiles(place, projectRoot).map(file => {
+  // The integration skills Astryx wrote there go with the project skill.
+  const files = [
+    ...placeSkillFiles(place, projectRoot),
+    ...leftoverIntegrationSkills(place, projectRoot, new Set()),
+  ];
+  return files.map(file => {
     if (linkedSkillFolder(file)) {
       return {file, action: /** @type {const} */ ('kept'), reason: /** @type {const} */ ('not-astryx')};
     }
@@ -200,4 +211,93 @@ export function keptText(reason, editedHint) {
     return "kept: the other copy of this place is not Astryx's, so neither copy is written";
   }
   return 'kept, not created by Astryx';
+}
+
+/**
+ * The state of one integration skill's file in each skills folder of `place`.
+ * @param {import('./skill-places.mjs').SkillPlace} place
+ * @param {string | null} projectRoot
+ * @param {{name: string, text: string}} skill
+ * @returns {Array<{file: string, state: import('./managed-skill-file.mjs').ManagedFileState}>}
+ */
+export function inspectIntegrationSkill(place, projectRoot, {name, text}) {
+  return placeFolders(place, projectRoot).map(folder => {
+    const file = path.join(folder, name, 'SKILL.md');
+    return {file, state: placeFileState(file, text)};
+  });
+}
+
+/**
+ * Write each integration skill into every skills folder of `place`, as
+ * `<folder>/<name>/SKILL.md`. The copies of one skill are written together or
+ * not at all, as the project skill's are.
+ * @param {import('./skill-places.mjs').SkillPlace} place
+ * @param {string | null} projectRoot
+ * @param {ReadonlyArray<{name: string, text: string}>} skills
+ * @returns {Array<{file: string, skill: string, action: import('./managed-skill-file.mjs').ManagedFileAction, reason?: 'edited' | 'not-astryx' | 'pair-kept'}>}
+ */
+export function writeIntegrationSkills(place, projectRoot, skills) {
+  const folders = placeFolders(place, projectRoot);
+  /** @type {ReturnType<typeof writeIntegrationSkills>} */
+  const rows = [];
+  for (const {name, text} of skills) {
+    const files = folders.map(folder => path.join(folder, name, 'SKILL.md'));
+    const states = files.map(file => ({file, state: placeFileState(file, text)}));
+    const owned = (/** @type {string} */ state) => state === 'edited' || state === 'foreign';
+    if (states.some(each => owned(each.state))) {
+      for (const {file, state} of states) {
+        rows.push({
+          file,
+          skill: name,
+          action: 'kept',
+          reason: owned(state) ? keptReason(/** @type {'edited' | 'foreign'} */ (state)) : 'pair-kept',
+        });
+      }
+      continue;
+    }
+    for (const file of files) rows.push({file, skill: name, ...writeManagedFile(file, text)});
+  }
+  return rows;
+}
+
+/**
+ * The integration skills Astryx wrote in `place` that no loaded integration
+ * declares any more, as after a package was removed: each skill folder whose
+ * SKILL.md is an unedited Astryx file, other than the project and computer
+ * skills and the names in `keep`.
+ * @param {import('./skill-places.mjs').SkillPlace} place
+ * @param {string | null} projectRoot
+ * @param {ReadonlySet<string>} keep
+ * @returns {string[]} the SKILL.md files
+ */
+export function leftoverIntegrationSkills(place, projectRoot, keep) {
+  /** @type {string[]} */
+  const files = [];
+  for (const folder of placeFolders(place, projectRoot)) {
+    let names;
+    try {
+      names = fs.readdirSync(folder);
+    } catch {
+      continue;
+    }
+    for (const name of names.sort()) {
+      if (name === PROJECT_SKILL_NAME || name === COMPUTER_SKILL_NAME || keep.has(name)) continue;
+      const file = path.join(folder, name, 'SKILL.md');
+      if (managedFileState(file, '') === 'differs') files.push(file);
+    }
+  }
+  return files;
+}
+
+/**
+ * Remove integration skill files, and each skill folder that leaves empty.
+ * @param {readonly string[]} files
+ * @returns {Array<{file: string, skill: string, action: import('./managed-skill-file.mjs').ManagedFileAction, reason?: 'edited' | 'not-astryx'}>}
+ */
+export function removeIntegrationSkillFiles(files) {
+  return files.map(file => ({
+    file,
+    skill: path.basename(path.dirname(file)),
+    ...removeManagedFileIfOwned(file),
+  }));
 }

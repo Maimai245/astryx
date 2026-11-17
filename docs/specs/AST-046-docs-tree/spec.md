@@ -319,6 +319,16 @@ and references from other packages are an open question (OQ2).
   namespace with no guide below it, such as a generated topic level (FR12), has
   no page. The docsite build MUST fail when a slug is both a page and a
   redirect, or both a flat topic and a namespace page.
+- **FR15 — A doc may also be a skill.** An integration's flat topic or
+  placed guide MAY declare `skill: {name, description}`. `astryx docs skills`
+  MUST list every skill the folder has (the project skill in a project, the
+  computer-level skill, then each declared skill in load order), and
+  `astryx docs skills/<name>` MUST print one, when no doc holds that route. A
+  skill whose name is not lowercase words joined by hyphens, is longer than 64
+  characters, is `astryx` or `astryx-project`, or repeats an earlier one, or
+  whose description is empty, more than one line, or longer than 1,024
+  characters, MUST be left out with a note naming why, and its doc still
+  loads.
 
 ### Platform support
 
@@ -374,6 +384,7 @@ Phase 1 changes these surfaces:
 | FR12          | `docs()` tests, the graph walk, and search tests                              | the level and its children in list order; a topic's Up, Previous, and Next; a flat topic hit's parent; an integration's flat topic                                                                                                                                                                                                                              | A flat topic without a home, a topic whose name changes, or a level that lists a placed guide                                                                                                                                                                                                              |
 | FR13          | Split tests over the topic before and after, the graph walk, and search tests | each old section key read through the namespace; a link and a token reference to the old topic; a `--dense` read; the topic list and a search for one section                                                                                                                                                                                                   | A dropped, merged, or copied section; a changed title or `id`; a reference left on the old identity; a name listed twice; a section found twice                                                                                                                                                            |
 | FR14          | Docsite page-generation and route-resolution tests                            | a split namespace; a nested namespace; a nested namespace with its own page; a page with a named sidebar parent in another group; a package-page namespace; a namespace with a `category`, and one whose guides are all foundations docs; a generated topic level                                                                                               | An old address that stops resolving or lands in a sidebar group other than its own or its named parent's, a permanent guide redirect, a guide page on a non-package namespace, a nested page its root page also holds, or a slug that is both a page and a redirect                                        |
+| FR15          | Skill discovery, `docs skills` and init `--to skills` tests                   | a valid skill on a topic and on a guide; each broken rule; a repeated name across two packages; `docs skills/<name>` for each kind of skill                                                                                                                                                                                                                    | A broken skill that is written or fails its doc, a repeated name that wins, or a skill `docs skills` does not list                                                                                                                                                                                         |
 
 ## Decision log
 

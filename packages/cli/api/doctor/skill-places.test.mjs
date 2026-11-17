@@ -154,6 +154,8 @@ describe('the skill-places check', () => {
             {path: '.claude/skills/astryx-project/SKILL.md', place: 'skills', state: 'edited'},
           ],
           renderError: null,
+          skillProblems: [],
+          leftovers: [],
           blockFiles: [],
           skillFiles: [SHARED],
           plainNamed: [],

@@ -981,7 +981,12 @@ export function checkSkillPlaces(ctx) {
   const report = ctx.skillPlaces;
   if (!report) return null;
   const blockOnly = report.places.length === 1 && report.places[0] === 'agents-md';
-  if (blockOnly && report.skillFiles.length === 0 && report.plainNamed.length === 0) {
+  if (
+    blockOnly &&
+    report.skillFiles.length === 0 &&
+    report.plainNamed.length === 0 &&
+    report.skillProblems.length === 0
+  ) {
     return null;
   }
   const base = {id: 'skill-places', label: 'Astryx skill places'};
@@ -1003,6 +1008,10 @@ export function checkSkillPlaces(ctx) {
       fix: `Delete ${report.plainNamed.length === 1 ? 'it' : 'them'}; ${init('--to skills')} writes the project skill as \`astryx-project\`.`,
     };
   }
+  const leftOutNote =
+    report.skillProblems.length > 0
+      ? ` Skills left out: ${report.skillProblems.map(problem => `${problem.package}: ${problem.message}`).join(' ')}`
+      : '';
   const savesBlock = report.places.includes('agents-md');
   const savesSkill = report.places.some(place => place !== 'agents-md');
   // Both saved is the person's choice: the note in the pass line says so.
@@ -1039,6 +1048,10 @@ export function checkSkillPlaces(ctx) {
   const missing = report.files.filter(file => file.state === 'absent');
   const stale = report.files.filter(file => file.state === 'differs');
   const kept = report.files.filter(file => file.state === 'edited' || file.state === 'foreign');
+  const leftoverNote =
+    report.leftovers.length > 0
+      ? ` Skills Astryx wrote for an integration this project no longer has: ${report.leftovers.join(', ')}; \`astryx upgrade --apply\` or init removes them.`
+      : '';
   const keptNote =
     kept.length > 0
       ? ` Kept as they are (edited, or not written by Astryx): ${kept.map(file => file.path).join(', ')}.`
@@ -1050,25 +1063,33 @@ export function checkSkillPlaces(ctx) {
   const codexNote = report.computerSkill && report.skillFiles.length > 0
     ? ' This computer also has the computer-level `astryx` skill, so Codex lists both skills.'
     : '';
-  if (missing.length > 0 || stale.length > 0) {
+  if (missing.length > 0 || stale.length > 0 || report.leftovers.length > 0) {
     const missingNote =
-      missing.length > 0 ? ` The Astryx skill is missing from ${missing.map(file => file.path).join(', ')}.` : '';
+      missing.length > 0 ? ` An Astryx skill is missing from ${missing.map(file => file.path).join(', ')}.` : '';
     const staleNote =
       stale.length > 0 ? ` It is from another release in ${stale.map(file => file.path).join(', ')}.` : '';
     return {
       ...base,
       status: 'warn',
-      message: `${(missingNote + staleNote).trim()}${keptNote}${codexNote}`,
-      fix: `Run ${init('')} to write the saved places (\`astryx upgrade --apply\` also refreshes them after an Astryx update).`,
+      message: `${(missingNote + staleNote).trim()}${keptNote}${leftoverNote}${codexNote}${leftOutNote}`,
+      fix: `Run ${init('')}: it writes every saved place again, and is the refresh after an integration changes (\`astryx upgrade --apply\` also refreshes them after an Astryx update).${leftOutNote ? ' For a skill left out, its package fixes the `skill` its note names.' : ''}`,
     };
   }
   const current = report.files.filter(file => file.state === 'current');
+  if (leftOutNote) {
+    return {
+      ...base,
+      status: 'warn',
+      message: `${leftOutNote.trim()}${keptNote}${codexNote}`,
+      fix: 'Its package fixes the `skill` each note names; until then agents get no line or skill for it.',
+    };
+  }
   return {
     ...base,
     status: kept.length > 0 && current.length === 0 ? 'info' : 'pass',
     message:
       current.length > 0
-        ? `The Astryx skill matches this release in ${current.map(file => file.path).join(', ')}.${keptNote}${bothNote}${codexNote}`
+        ? `The Astryx skill matches this release in ${current.map(file => file.path).join(', ')}.${keptNote}${leftoverNote}${bothNote}${codexNote}`
         : `Saved places: ${report.places.join(', ')}.${keptNote}${bothNote}${codexNote}`,
   };
 }

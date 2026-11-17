@@ -66,12 +66,17 @@ import {
 import {CORE_PROVIDER_ID} from '../../foundation/identity/providers.mjs';
 import {renderProjectSkill, savedName} from '../../foundation/agent-docs/skill-places.mjs';
 import {
+  inspectIntegrationSkill,
   inspectSkillPlace,
+  leftoverIntegrationSkills,
   readProjectPlaces,
   keptText,
+  removeIntegrationSkillFiles,
+  writeIntegrationSkills,
   skillPlaceEscape,
   writeSkillPlace,
 } from '../../foundation/agent-docs/skill-place-files.mjs';
+import {integrationSkillFiles} from '../docs/skills/skills.mjs';
 
 /** The package that owns Core's components, hooks, and codemods. */
 export {CORE_PROVIDER_ID as CORE_PACKAGE} from '../../foundation/identity/providers.mjs';
@@ -493,8 +498,9 @@ export async function runPostCodemodHooks(hooks, context) {
  *   folder), so the result is `error` whatever the block refresh does
  * @property {boolean} [noBlock] the project saves no `agents-md` place and
  *   has no block, so its skill files give the status
- * @property {{text: string, writes: Array<{place: import('../../foundation/agent-docs/skill-places.mjs').SkillPlace, rows: Map<string, import('./upgrade.type.mjs').UpgradeSkillFile>}>} | null} [skills]
- *   the project skill and the files of the saved skill places it would write
+ * @property {{text: string, writes: SkillWrite[]} | null} [skills]
+ *   the project skill, and each skill whose copies in a saved skill place it
+ *   would write or remove
  */
 
 /**
@@ -578,6 +584,13 @@ function refuseSkillRefresh(plan, reason) {
 }
 
 /**
+ * The copies of one skill in one saved place that upgrade writes together:
+ * the project skill, an integration's skill (`skill`), or a skill Astryx
+ * wrote for an integration the project no longer has (`remove`).
+ * @typedef {{place: import('../../foundation/agent-docs/skill-places.mjs').SkillPlace, rows: Map<string, import('./upgrade.type.mjs').UpgradeSkillFile>, skill?: {name: string, text: string}, remove?: boolean}} SkillWrite
+ */
+
+/**
  * Plan the refresh of the saved skill places: each file this release's
  * project skill would create or update, and each it keeps (edited, or not
  * Astryx's). A file is written only by `--apply`.
@@ -615,16 +628,26 @@ async function prepareSkillRefresh(plan, skillPlaces, {installedVersion, apply, 
     }
   }
   const text = renderProjectSkill(block);
+  const declared = await integrationSkillFiles(cwd);
+  for (const problem of declared.problems) {
+    logger.warn(`Note: ${problem.package}: ${problem.message}`);
+  }
+  const keep = new Set(declared.skills.map(each => each.name));
   const shownFrom = origin ?? cwd;
-  /** @type {Array<{place: import('../../foundation/agent-docs/skill-places.mjs').SkillPlace, rows: Map<string, import('./upgrade.type.mjs').UpgradeSkillFile>}>} */
+  /** @type {SkillWrite[]} */
   const writes = [];
   let created = 0;
   let total = 0;
-  for (const place of skillPlaces) {
-    const states = inspectSkillPlace(place, cwd, text);
-    // The copies of a place are written together or not at all, as init
-    // writes them: one person's file keeps every copy as it is.
-    const owned = states.find(({state}) => state === 'edited' || state === 'foreign');
+  /**
+   * Plan the copies of one skill in one place. The copies are written
+   * together or not at all, as init writes them: one person's file keeps
+   * every copy as it is.
+   * @param {import('../../foundation/agent-docs/skill-places.mjs').SkillPlace} place
+   * @param {Array<{file: string, state: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileState}>} states
+   * @param {{name: string, text: string}} [skill] an integration's skill; the project skill without it
+   */
+  const planCopies = (place, states, skill) => {
+    const owned = states.some(({state}) => state === 'edited' || state === 'foreign');
     /** @type {Map<string, import('./upgrade.type.mjs').UpgradeSkillFile>} */
     const rows = new Map();
     for (const {file, state} of states) {
@@ -632,28 +655,47 @@ async function prepareSkillRefresh(plan, skillPlaces, {installedVersion, apply, 
       const row = {
         path: path.relative(shownFrom, file).split(path.sep).join('/'),
         place: savedName(place),
+        ...(skill ? {skill: skill.name} : {}),
         action:
           state === 'current'
             ? 'current'
-            : state === 'edited' || state === 'foreign'
+            : owned
               ? 'kept'
-              : owned
-                ? 'kept'
-                : state === 'absent'
-                  ? 'would-create'
-                  : 'would-update',
+              : state === 'absent'
+                ? 'would-create'
+                : 'would-update',
       };
       if (row.action === 'kept') {
         row.reason =
           state === 'edited' ? 'edited' : state === 'foreign' ? 'not-astryx' : 'pair-kept';
       }
-      total += 1;
-      if (state === 'absent') created += 1;
+      if (!skill) {
+        total += 1;
+        if (state === 'absent') created += 1;
+      }
       summary.skills?.push(row);
       rows.set(file, row);
     }
     if ([...rows.values()].some(row => row.action.startsWith('would-'))) {
-      writes.push({place, rows});
+      writes.push({place, rows, skill});
+    }
+  };
+  for (const place of skillPlaces) {
+    planCopies(place, inspectSkillPlace(place, cwd, text));
+    for (const each of declared.skills) {
+      planCopies(place, inspectIntegrationSkill(place, cwd, each), each);
+    }
+    // A skill Astryx wrote for an integration the project no longer has.
+    for (const file of leftoverIntegrationSkills(place, cwd, keep)) {
+      /** @type {import('./upgrade.type.mjs').UpgradeSkillFile} */
+      const row = {
+        path: path.relative(shownFrom, file).split(path.sep).join('/'),
+        place: savedName(place),
+        skill: path.basename(path.dirname(file)),
+        action: 'would-remove',
+      };
+      summary.skills?.push(row);
+      writes.push({place, rows: new Map([[file, row]]), remove: true});
     }
   }
   // A kept file stays on its old text: say so, as init does.
@@ -792,8 +834,13 @@ export function applyAgentDocsRefresh(plan) {
 function applySkillRefresh(plan) {
   const {summary, skills} = plan;
   if (!skills || skills.writes.length === 0) return;
-  for (const {place, rows} of skills.writes) {
-    for (const result of writeSkillPlace(place, plan.cwd, skills.text)) {
+  for (const {place, rows, skill, remove} of skills.writes) {
+    const results = remove
+      ? removeIntegrationSkillFiles([...rows.keys()])
+      : skill
+        ? writeIntegrationSkills(place, plan.cwd, [skill])
+        : writeSkillPlace(place, plan.cwd, skills.text);
+    for (const result of results) {
       const row = rows.get(result.file);
       if (!row) continue;
       if (result.action === 'kept') {
@@ -802,10 +849,12 @@ function applySkillRefresh(plan) {
         continue;
       }
       row.action =
-        result.action === 'created' ? 'created' : result.action === 'updated' ? 'updated' : 'current';
+        result.action === 'created' || result.action === 'updated' || result.action === 'removed'
+          ? result.action
+          : 'current';
       if (row.action !== 'current') {
         summary.refreshed = true;
-        logger.log(`[ok] Astryx skill refreshed -> ${row.path}`);
+        logger.log(`[ok] Astryx skill ${row.action === 'removed' ? 'removed' : 'refreshed'} -> ${row.path}`);
       }
     }
   }

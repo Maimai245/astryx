@@ -34,6 +34,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
+  MARKER_END,
   MARKER_START,
   PROJECT_SKILL_FOLDERS,
   PROJECT_SKILL_NAME,
@@ -311,6 +312,44 @@ export function renderProjectSkill(block) {
       '---',
       '',
       block,
+      '',
+    ].join('\n'),
+  );
+}
+
+/**
+ * The skills folders a place holds: both project skills folders for
+ * `skills`, the folder itself for a folder place, none for the others.
+ * @param {SkillPlace} place
+ * @param {string | null} projectRoot
+ * @returns {string[]}
+ */
+export function placeFolders(place, projectRoot) {
+  if (place.kind === 'skills' && projectRoot != null) {
+    return PROJECT_SKILL_FOLDERS.map(folder => path.join(projectRoot, folder));
+  }
+  if (place.kind === 'folder') return [place.dir];
+  return [];
+}
+
+/**
+ * An integration's skill: its doc as text under skill frontmatter, inside the
+ * Astryx markers, with the hash line that tells an edited file from an older
+ * rendering.
+ * @param {{name: string, description: string, body: string}} skill
+ * @returns {string}
+ */
+export function renderIntegrationSkill({name, description, body}) {
+  return withHash(
+    [
+      '---',
+      `name: ${name}`,
+      `description: ${JSON.stringify(description)}`,
+      '---',
+      '',
+      MARKER_START,
+      body.trimEnd(),
+      MARKER_END,
       '',
     ].join('\n'),
   );

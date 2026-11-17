@@ -29,6 +29,11 @@ import {
 import {
   addComputerSkillFolders,
   assertPlaceWithin,
+  integrationSkillProblems,
+  integrationSkillTexts,
+  leftoverIntegrationSkills,
+  removeIntegrationSkillFiles,
+  writeIntegrationSkills,
   computerSkillText,
   inspectAgentDocs,
   projectInstallStep,
@@ -321,7 +326,7 @@ async function applyPlaces(cwd, options, invocation, data, given) {
   /** @param {import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace} place */
   const record = (
     place,
-    /** @type {ReturnType<typeof writeSkillPlace>} */ rows,
+    /** @type {Array<{file: string, action: import('../../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileAction, reason?: 'edited' | 'not-astryx' | 'pair-kept', skill?: string}>} */ rows,
   ) => {
     for (const row of rows) {
       const receipt = skillReceiptRow(place, row, shown, 'delete it to get the current text');
@@ -350,6 +355,10 @@ async function applyPlaces(cwd, options, invocation, data, given) {
   // holds the guidance.
   const text =
     skillPlaces.length > 0 && projectRoot ? await projectSkillText(projectRoot) : null;
+  // Each skill an integration declares goes into every skill place beside
+  // the project skill.
+  const declared =
+    text != null && projectRoot ? await integrationSkillTexts(projectRoot) : null;
   if (previous && projectRoot && projectPlaces.length > 0) {
     saveProjectPlaces(projectRoot, projectPlaces, {check: true});
   }
@@ -357,6 +366,13 @@ async function applyPlaces(cwd, options, invocation, data, given) {
   // project never goes without the guidance.
   if (projectPlaces.some(place => place.kind === 'agents-md')) {
     await applyAgents(cwd, options, invocation, data);
+    // Without a skill place, a left-out skill still loses its line in the
+    // block; say so once.
+    if (declared == null && projectRoot) {
+      for (const problem of await integrationSkillProblems(projectRoot)) {
+        logger.warn(`Note: ${problem.package}: ${problem.message}`);
+      }
+    }
   }
   // Whether the guidance landed in a skill place: a place whose files are
   // all a person's own is kept as it is, so it holds no Astryx text.
@@ -369,6 +385,17 @@ async function applyPlaces(cwd, options, invocation, data, given) {
       if (rows.some(row => row.action !== 'kept')) landed = true;
       actions.push(...rows.map(row => row.action));
       record(place, rows);
+      if (declared) {
+        record(place, writeIntegrationSkills(place, projectRoot, declared.skills));
+        const keep = new Set(declared.skills.map(each => each.name));
+        record(
+          place,
+          removeIntegrationSkillFiles(leftoverIntegrationSkills(place, projectRoot, keep)),
+        );
+      }
+    }
+    for (const problem of declared?.problems ?? []) {
+      logger.warn(`Note: ${problem.package}: ${problem.message}`);
     }
     // Without the block, the project skill files say whether the project
     // was set up before this run, as the agent docs do for the block.

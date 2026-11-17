@@ -17,6 +17,7 @@
  *   foundation/integrations, the discovery loaders, and discover sources.
  */
 
+import {discoverIntegrationSkills} from '../../foundation/discovery/integration-skills.mjs';
 import {createHash} from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -112,6 +113,7 @@ const DEPENDENCY_FIELDS = [
  *   docSections?: Record<string, string[]>,
  *   themes?: string[],
  *   codemods?: string[],
+ *   skills?: string[],
  *   iconSets?: string[],
  *   iconSetDetails?: IconSetSummary[],
  *   withdrawnIconSets?: Array<{name: string, reason: string}>,
@@ -268,6 +270,11 @@ export async function describeInstalled(project, scanned) {
   if (project == null) return scanned;
   const byName = new Map(scanned.map(pkg => [pkg.name, pkg]));
   const docs = await projectDocs(project);
+  // The skills its docs declare, made unique across the project's
+  // integrations as the skill places write them.
+  const {skills: declaredSkills} = await discoverIntegrationSkills(
+    project.loadedIntegrations,
+  );
   /** @type {InstalledPackage[]} */
   const installed = [];
   for (const integration of project.loadedIntegrations) {
@@ -317,6 +324,9 @@ export async function describeInstalled(project, scanned) {
       ),
       themes: identities.themes.map(t => t.slug),
       codemods: identities.codemods.map(c => `${c.version}/${c.id}`),
+      skills: declaredSkills
+        .filter(each => each.package === integration.name)
+        .map(each => each.name),
       iconSets: sets.map(set => set.name),
       iconSetDetails: sets.map(set => ({
         name: set.name,
@@ -1166,6 +1176,7 @@ export function toEntry(pkg) {
     if (Array.isArray(values) && values.length > 0) entry[field] = values;
   }
   if (pkg.docSections) entry.docSections = pkg.docSections;
+  if (pkg.skills?.length) entry.skills = pkg.skills;
   if (pkg.latest) entry.latest = pkg.latest;
   return /** @type {import('./discover.type.mjs').DiscoverListEntry} */ (entry);
 }

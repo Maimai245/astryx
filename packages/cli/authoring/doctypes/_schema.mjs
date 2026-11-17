@@ -496,6 +496,10 @@ function buildDocSchemas() {
       replaces: nonEmptyString.optional(),
       extends: nonEmptyString.optional(),
       tokenCategory: z.string().optional(),
+      // The skill's own rules are checked where skills are gathered
+      // (authoring/doctypes/reference/skill.mjs), so a skill that breaks one
+      // is left out while the doc still loads.
+      skill: z.object({name: z.string(), description: z.string()}).optional(),
     })
     .passthrough()
     .superRefine((doc, context) => {
@@ -855,6 +859,10 @@ function buildDocSchemas() {
     replaces: nonEmptyString.optional(),
     extends: nonEmptyString.optional(),
     tokenCategory: z.string().optional(),
+      // The skill's own rules are checked where skills are gathered
+      // (authoring/doctypes/reference/skill.mjs), so a skill that breaks one
+      // is left out while the doc still loads.
+      skill: z.object({name: z.string(), description: z.string()}).optional(),
   })
     .passthrough()
     .superRefine((doc, context) => {
