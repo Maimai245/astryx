@@ -25,8 +25,8 @@ import {renderComputerAgentText} from '../../foundation/agent-docs/computer-agen
 
 const MARKER_START = '<!-- ASTRYX:START -->';
 const MARKER_END = '<!-- ASTRYX:END -->';
-const SHARED = '.agents/skills/astryx/SKILL.md';
-const CLAUDE = '.claude/skills/astryx/SKILL.md';
+const SHARED = '.agents/skills/astryx-project/SKILL.md';
+const CLAUDE = '.claude/skills/astryx-project/SKILL.md';
 
 /** @type {string[]} */
 const dirs = [];
@@ -144,7 +144,7 @@ describe('init --to skills', () => {
     expect(read(SHARED)).toBe(read(CLAUDE));
     expect(read(SHARED)).toMatch(
       new RegExp(
-        `^---\\nname: astryx\\ndescription: ${JSON.stringify(PROJECT_SKILL_DESCRIPTION).replace(/[.()]/gu, '\\$&')}\\n---\\n\\n${MARKER_START}\\n`,
+        `^---\\nname: astryx-project\\ndescription: ${JSON.stringify(PROJECT_SKILL_DESCRIPTION).replace(/[.()]/gu, '\\$&')}\\n---\\n\\n${MARKER_START}\\n`,
         'u',
       ),
     );
@@ -174,6 +174,25 @@ describe('init --to skills', () => {
       'unchanged',
     ]);
     expect(exists('AGENTS.md')).toBe(false);
+  });
+
+  it('is named apart from the computer-level skill, so neither hides the other', async () => {
+    await init({to: 'user'}, {cwd: project});
+    await run({to: 'skills'});
+    expect(read(SHARED)).toMatch(/^---\nname: astryx-project\n/u);
+    const computer = fs.readFileSync(path.join(home, '.agents', 'skills', 'astryx', 'SKILL.md'), 'utf8');
+    expect(computer).toMatch(/^---\nname: astryx\n/u);
+  });
+
+  it("writes neither copy when one is a person's own, and says why", async () => {
+    fs.mkdirSync(path.dirname(path.join(project, SHARED)), {recursive: true});
+    fs.writeFileSync(path.join(project, SHARED), '---\nname: astryx-project\ndescription: "mine"\n---\n');
+    const data = await run({to: 'skills'});
+    expect(data.skills).toEqual([
+      {path: SHARED, place: 'skills', action: 'kept', reason: 'not-astryx'},
+      {path: CLAUDE, place: 'skills', action: 'kept', reason: 'pair-kept'},
+    ]);
+    expect(exists(CLAUDE)).toBe(false);
   });
 
   it('keeps a skill file a person edited, and one Astryx did not write', async () => {
@@ -229,14 +248,22 @@ describe('moving a project between places', () => {
     expect(exists('.claude/skills')).toBe(false);
     expect(read('.claude/settings.json')).toBe('{}\n');
     expect(exists('AGENTS.md')).toBe(true);
-    expect(config()).toBe('export default {};\n');
+    expect(exists('astryx.config.mjs')).toBe(false);
+  });
+
+  it('keeps a config that holds anything else when the place key goes', async () => {
+    fs.writeFileSync(path.join(project, 'astryx.config.mjs'), 'export default {integrations: []};\n');
+    await run({to: 'skills'});
+    await run({to: 'agents-md'});
+    expect(config()).not.toContain('skills');
+    expect(config()).toContain('integrations');
   });
 
   it('saves a list, and a folder in the project as ./ and its path', async () => {
     const data = await run({to: 'agents-md,./docs/skills'});
     expect(data.to).toEqual(['agents-md', './docs/skills']);
     expect(exists('AGENTS.md')).toBe(true);
-    expect(exists('docs/skills/astryx/SKILL.md')).toBe(true);
+    expect(exists('docs/skills/astryx-project/SKILL.md')).toBe(true);
     expect(config()).toContain("to: ['agents-md', './docs/skills']");
     const again = await run({});
     expect(again.to).toEqual(['agents-md', './docs/skills']);
@@ -308,13 +335,13 @@ describe('computer places', () => {
     );
     expect(data.skills.at(-1)).toEqual({
       path: file,
-      place: team,
+      place: '~/team-skills',
       action: 'created',
     });
-    expect(settings().skills.to).toEqual([team]);
+    expect(settings().skills.to).toEqual(['~/team-skills']);
     expect(config()).toContain("to: 'skills'");
     await run({to: path.join(home, 'other')});
-    expect(settings().skills.to).toEqual([team, path.join(home, 'other')]);
+    expect(settings().skills.to).toEqual(['~/team-skills', '~/other']);
   });
 
   it('user with a project place reports both', async () => {
@@ -330,7 +357,7 @@ describe('computer places', () => {
     expect(
       fs.existsSync(path.join(outside, 'skills-out', 'astryx', 'SKILL.md')),
     ).toBe(true);
-    expect(data.to).toEqual(['./skills-out']);
+    expect(data.to).toEqual([path.join(outside, 'skills-out')]);
     const err = await refusal(() => run({to: 'skills'}, outside));
     expect(err.code).toBe(ERROR_CODES.ERR_INVALID_ARGUMENT);
     expect(err.message).toContain('not in a project');

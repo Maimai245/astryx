@@ -93,7 +93,7 @@ describe('renderProjectSkill', () => {
       '<!-- ASTRYX:START -->\nbody\n<!-- ASTRYX:END -->',
     );
     expect(text).toMatch(
-      /^---\nname: astryx\ndescription: ".+"\n---\n\n<!-- ASTRYX:START -->\n<!-- astryx-managed sha256:[0-9a-f]{64} -->\nbody\n<!-- ASTRYX:END -->\n$/u,
+      /^---\nname: astryx-project\ndescription: ".+"\n---\n\n<!-- ASTRYX:START -->\n<!-- astryx-managed sha256:[0-9a-f]{64} -->\nbody\n<!-- ASTRYX:END -->\n$/u,
     );
     expect(() => renderProjectSkill('body')).toThrow('managed block');
   });

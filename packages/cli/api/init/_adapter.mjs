@@ -45,6 +45,8 @@ import {
   savedProjectPlaces,
 } from '../../foundation/agent-docs/skill-places.mjs';
 import {
+  keptReason,
+  managedFileState,
   removeManagedFileIfOwned,
   writeManagedFile,
 } from '../../foundation/agent-docs/managed-skill-file.mjs';
@@ -141,13 +143,20 @@ export async function readProjectPlaces(projectRoot) {
 
 /**
  * Save the project places in `skills.to` of the project's config: no key for
- * the default alone. A protected or dynamic config throws, before any file
+ * the default alone, and no config file when nothing else is left in it. A protected or dynamic config throws, before any file
  * is written.
  * @param {string} projectRoot
  * @param {readonly import('../../foundation/agent-docs/skill-places.mjs').SkillPlace[]} places
  */
 export function saveProjectPlaces(projectRoot, places) {
-  setConfigValues(projectRoot, [['skills.to', projectPlacesValue(places)]]);
+  const {file, changed} = setConfigValues(projectRoot, [
+    ['skills.to', projectPlacesValue(places)],
+  ]);
+  // A config left holding nothing says what no config says, so it goes, as
+  // after a move back to the default place in a project init gave a config.
+  if (changed && /^export default \{\};?\s*$/u.test(fs.readFileSync(file, 'utf8'))) {
+    fs.unlinkSync(file);
+  }
 }
 
 /**
@@ -169,17 +178,26 @@ export function computerSkillText(command) {
 }
 
 /**
- * Write `text` to each skill file of `place`.
+ * Write `text` to each skill file of `place`. The copies of one place are
+ * written together or not at all: when any is a person's own (edited, or not
+ * Astryx's), each is kept, so every agent reads one text.
  * @param {import('../../foundation/agent-docs/skill-places.mjs').SkillPlace} place
  * @param {string | null} projectRoot
  * @param {string} text
- * @returns {Array<{file: string, action: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileAction, reason?: 'edited' | 'not-astryx'}>}
+ * @returns {Array<{file: string, action: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileAction, reason?: 'edited' | 'not-astryx' | 'pair-kept'}>}
  */
 export function writeSkillPlace(place, projectRoot, text) {
-  return placeSkillFiles(place, projectRoot).map(file => ({
-    file,
-    ...writeManagedFile(file, text),
-  }));
+  const files = placeSkillFiles(place, projectRoot);
+  const states = files.map(file => ({file, state: managedFileState(file, text)}));
+  const owned = (/** @type {string} */ state) => state === 'edited' || state === 'foreign';
+  if (files.length > 1 && states.some(each => owned(each.state))) {
+    return states.map(({file, state}) => ({
+      file,
+      action: /** @type {const} */ ('kept'),
+      reason: owned(state) ? keptReason(/** @type {'edited' | 'foreign'} */ (state)) : /** @type {const} */ ('pair-kept'),
+    }));
+  }
+  return files.map(file => ({file, ...writeManagedFile(file, text)}));
 }
 
 /**
@@ -221,7 +239,7 @@ function removeEmptyFolders(dir, stop) {
 
 /**
  * Add folders outside any project to the ones the settings file records.
- * @param {readonly string[]} folders as written
+ * @param {readonly string[]} folders as saved: `~/<path>` or absolute
  */
 export function addComputerSkillFolders(folders) {
   const saved = computerSkillFolders();

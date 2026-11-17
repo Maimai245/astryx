@@ -467,9 +467,10 @@ works on is `spec:AST-040` FR9's.
     keeping that text installed, in the background, as FR8 states; no other
     command writes them, and no package install script does;
   - a folder a person names with `astryx init --to <folder>`, for
-    `<folder>/astryx/SKILL.md` only: the project skill when the folder is in
-    the project, else the computer-level text. The project skills folders
-    `--to skills` writes sit in the folder where `init` writes agent docs.
+    `<folder>/astryx-project/SKILL.md` (the project skill) when the folder is
+    in the project, else `<folder>/astryx/SKILL.md` (the computer-level
+    text). The project skills folders `--to skills` writes sit in the folder
+    where `init` writes agent docs.
 
   No run writes a project's agent docs into the home folder or a settings folder
   in it (`architecture:cli-surface` INV31); the computer-level agent text above

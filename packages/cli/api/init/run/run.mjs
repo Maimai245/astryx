@@ -274,6 +274,7 @@ const SKILL_KEPT = {
   edited:
     'kept, edited since Astryx wrote it; delete it to get the current text',
   'not-astryx': 'kept, not created by Astryx',
+  'pair-kept': "kept: the other copy of this place is not Astryx's, so neither copy is written",
 };
 
 /**

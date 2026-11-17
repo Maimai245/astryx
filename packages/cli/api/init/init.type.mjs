@@ -45,7 +45,7 @@
  * @property {string} path The file: relative to the project root for a project place, absolute for a folder outside the project.
  * @property {string} place The place it belongs to, as saved: `skills` or a folder.
  * @property {'created' | 'updated' | 'unchanged' | 'removed' | 'kept'} action
- * @property {'edited' | 'not-astryx'} [reason] Only on `kept`: `edited`, a person changed it since Astryx wrote it; `not-astryx`, Astryx did not write it.
+ * @property {'edited' | 'not-astryx' | 'pair-kept'} [reason] Only on `kept`: `edited`, a person changed it since Astryx wrote it; `not-astryx`, Astryx did not write it; `pair-kept`, the other copy of the `skills` place is a person's own, so neither copy is written and every agent reads one text.
  */
 
 /**

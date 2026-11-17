@@ -19,7 +19,8 @@
  * - `computerAgentText.links`: the links to the skill folder Astryx made, so
  *   removal removes exactly those.
  * - `skills.to`: the folders outside any project that `astryx init --to
- *   <folder>` put the computer-level skill in, as written. The `user` place
+ *   <folder>` put the computer-level skill in: `~/` and a path in the home
+ *   folder, else an absolute path. The `user` place
  *   is `computerAgentText`, which every release reads.
  *
  * Only `astryx init --user`, `astryx init --to`, and the global copy's
@@ -123,8 +124,8 @@ function writeSettings(next, configDir) {
 }
 
 /**
- * The folders outside any project that hold the computer-level skill, as
- * written (`~/team-skills`).
+ * The folders outside any project that hold the computer-level skill
+ * (`~/team-skills`, or an absolute path).
  * @param {string} [configDir]
  * @returns {string[]}
  */

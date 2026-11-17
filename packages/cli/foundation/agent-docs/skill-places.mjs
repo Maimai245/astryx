@@ -7,14 +7,17 @@
  * A place is one of:
  * - `agents-md`: the managed block in AGENTS.md and the agent files beside
  *   it. The default for a project, and the place when nothing is saved.
- * - `skills`: the project's skills folders, `.agents/skills/astryx/SKILL.md`
- *   and a copy at `.claude/skills/astryx/SKILL.md` (`PROJECT_SKILL_FOLDERS`).
- *   Each is a regular file: a link in a repository breaks in a checkout that
- *   does not make links.
+ * - `skills`: the project's skills folders,
+ *   `.agents/skills/astryx-project/SKILL.md` and a copy at
+ *   `.claude/skills/astryx-project/SKILL.md` (`PROJECT_SKILL_FOLDERS`). Each
+ *   is a regular file: a link in a repository breaks in a checkout that does
+ *   not make links. The two copies are one place: when either is a person's
+ *   own, neither is written, so every agent reads one text.
  * - `user`: the computer-level skill (`computer-agent-text.mjs`).
- * - a folder: `<folder>/astryx/SKILL.md`. A folder inside the project gets
- *   the project skill and is saved in the project's config; any other folder
- *   gets the computer-level skill and is saved in the settings file.
+ * - a folder: a folder inside the project gets the project skill,
+ *   `<folder>/astryx-project/SKILL.md`, and is saved in the project's config;
+ *   any other folder gets the computer-level skill, `<folder>/astryx/SKILL.md`,
+ *   and is saved in the settings file.
  *
  * A folder is written as a path (`./team`, `../skills`, `~/team-skills`, an
  * absolute path), so a misspelled keyword is refused, not made a folder.
@@ -48,8 +51,16 @@ export const PROJECT_SKILL_FOLDERS = Object.freeze([
   path.join('.claude', 'skills'),
 ]);
 
-/** The skill's folder name in every skills folder. */
-export const SKILL_NAME = 'astryx';
+/**
+ * The project skill's name, which is also its folder's name. It differs from
+ * the computer-level skill's (`astryx`): an agent that reads both a user and
+ * a project skill of one name shows only one of them, and Claude Code shows
+ * the user one, which would hide the project's.
+ */
+export const PROJECT_SKILL_NAME = 'astryx-project';
+
+/** The computer-level skill's name and folder name. */
+export const COMPUTER_SKILL_NAME = 'astryx';
 
 /**
  * When an agent loads the project skill; the frontmatter `description`. One
@@ -75,7 +86,8 @@ export class SkillPlaceError extends Error {
  * One parsed place. `scope`: `project` places are saved in the project's
  * config, `computer` places in the settings file. A folder carries its
  * absolute path and the text it is saved as: `./` and its path from the
- * project root, or as written for a computer folder.
+ * project root, or, for a computer folder, `~/` and its path in the home
+ * folder, else its absolute path.
  * @typedef {{scope: 'project', kind: 'agents-md' | 'skills'}
  *   | {scope: 'computer', kind: 'user'}
  *   | {scope: 'project' | 'computer', kind: 'folder', dir: string, saved: string}} SkillPlace
@@ -110,6 +122,19 @@ function absoluteFolder(value, cwd, home) {
     return path.join(home, value.slice(2));
   }
   return path.resolve(cwd, value);
+}
+
+/**
+ * How a computer folder is saved: `~/` and its path in the home folder, else
+ * its absolute path, so a later run finds it from any folder.
+ * @param {string} dir absolute
+ * @param {string} home
+ * @returns {string}
+ */
+function homePath(dir, home) {
+  return inside(dir, home) && dir !== home
+    ? `~/${path.relative(home, dir).split(path.sep).join('/')}`
+    : dir;
 }
 
 /**
@@ -172,7 +197,7 @@ export function parsePlaces(names, {cwd, projectRoot, home = os.homedir()}) {
           saved: rel ? `./${rel}` : '.',
         };
       } else {
-        place = {scope: 'computer', kind: 'folder', dir, saved: name};
+        place = {scope: 'computer', kind: 'folder', dir, saved: homePath(dir, home)};
       }
     } else {
       throw new SkillPlaceError(`Unknown place "${name}".`);
@@ -254,11 +279,12 @@ export function projectPlacesValue(projectPlaces) {
 export function placeSkillFiles(place, projectRoot) {
   if (place.kind === 'skills' && projectRoot != null) {
     return PROJECT_SKILL_FOLDERS.map(folder =>
-      path.join(projectRoot, folder, SKILL_NAME, 'SKILL.md'),
+      path.join(projectRoot, folder, PROJECT_SKILL_NAME, 'SKILL.md'),
     );
   }
   if (place.kind === 'folder') {
-    return [path.join(place.dir, SKILL_NAME, 'SKILL.md')];
+    const name = place.scope === 'project' ? PROJECT_SKILL_NAME : COMPUTER_SKILL_NAME;
+    return [path.join(place.dir, name, 'SKILL.md')];
   }
   return [];
 }
@@ -276,7 +302,7 @@ export function renderProjectSkill(block) {
   return withHash(
     [
       '---',
-      `name: ${SKILL_NAME}`,
+      `name: ${PROJECT_SKILL_NAME}`,
       // Quoted: the description holds `: ` and `;`, which strict YAML parsers
       // can misread, and an agent tool that fails to parse drops the skill.
       `description: ${JSON.stringify(PROJECT_SKILL_DESCRIPTION)}`,
