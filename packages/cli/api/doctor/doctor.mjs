@@ -164,8 +164,9 @@ import {
  * @property {string|null} [projectCore] - The Core release the project names
  *   (installed, else locked, else declared), as the daily hint reads it.
  * @property {string|null} configPath - Resolved astryx.config.mjs path, or null.
- * @property {string[]} [projectSkillFiles] The project skill files that are
- *   there, when astryx.config `skills.to` saves no `agents-md` place.
+ * @property {Array<{file: string, state: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileState}> | null} [projectSkillFiles]
+ *   The project skill files and their states, when astryx.config `skills.to`
+ *   saves no `agents-md` place; null otherwise.
  * @property {import('../../foundation/integrations/integrations.mjs').LoadedIntegration[]|null} [integrations]
  *   Every integration the project loaded, or null when the project could not be
  *   read at all.
@@ -874,14 +875,40 @@ export function checkAgentDocs(ctx) {
       : initFix;
 
   // A project that keeps its Astryx guidance as a skill (astryx.config
-  // `skills.to` without `agents-md`) has no agent file to find.
-  const skillFiles = ctx.projectSkillFiles ?? [];
-  if (present.length === 0 && skillFiles.length > 0) {
+  // `skills.to` without `agents-md`) is judged by its skill files; its agent
+  // files are its own text.
+  const skillFiles = ctx.projectSkillFiles;
+  if (skillFiles) {
+    const current = skillFiles.filter(each => each.state === 'current');
+    const stale = skillFiles.filter(each => each.state === 'differs');
+    const kept = skillFiles.filter(each => each.state === 'edited' || each.state === 'foreign');
+    const list = (/** @type {typeof skillFiles} */ files) => files.map(each => shown(each.file)).join(', ');
+    const keptNote = kept.length > 0 ? ` Kept as they are (edited, or not written by Astryx): ${list(kept)}.` : '';
+    if (stale.length === 0 && current.length > 0) {
+      return {
+        id: 'agent-docs',
+        label: 'AI agent docs',
+        status: 'pass',
+        message: `The Astryx skill matches this release in ${list(current)} (astryx.config skills.to).${keptNote}`,
+      };
+    }
+    if (stale.length === 0 && kept.length > 0) {
+      return {
+        id: 'agent-docs',
+        label: 'AI agent docs',
+        status: 'info',
+        message: `The project keeps its Astryx guidance as a skill (astryx.config skills.to).${keptNote}`,
+      };
+    }
     return {
       id: 'agent-docs',
       label: 'AI agent docs',
-      status: 'pass',
-      message: `Astryx skill present in ${skillFiles.map(shown).join(', ')} (astryx.config skills.to).`,
+      status: 'warn',
+      message:
+        stale.length > 0
+          ? `The Astryx skill is from another release in ${list(stale)}.${keptNote}`
+          : 'The project saves its Astryx guidance as a skill (astryx.config skills.to), and no skill file is there.',
+      fix: fixFor(`Run \`${getCliInvocation(ctx.cwd)} init\` to write the saved places.`),
     };
   }
   if (present.length === 0) {

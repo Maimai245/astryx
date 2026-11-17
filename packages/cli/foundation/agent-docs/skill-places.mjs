@@ -33,7 +33,11 @@
 
 import * as os from 'node:os';
 import * as path from 'node:path';
-import {MARKER_START} from './agent-doc-state.mjs';
+import {
+  MARKER_START,
+  PROJECT_SKILL_FOLDERS,
+  PROJECT_SKILL_NAME,
+} from './agent-doc-state.mjs';
 import {withHash} from './managed-skill-file.mjs';
 
 /** The keywords `--to` takes besides a folder. */
@@ -42,22 +46,9 @@ export const PLACE_KEYWORDS = Object.freeze(['agents-md', 'skills', 'user']);
 /** The project place that holds the block; the default. */
 export const AGENTS_MD_PLACE = 'agents-md';
 
-/**
- * The project skills folders `--to skills` writes, relative to the project
- * root: the shared folder most agents read, and Claude Code's own.
- */
-export const PROJECT_SKILL_FOLDERS = Object.freeze([
-  path.join('.agents', 'skills'),
-  path.join('.claude', 'skills'),
-]);
-
-/**
- * The project skill's name, which is also its folder's name. It differs from
- * the computer-level skill's (`astryx`): an agent that reads both a user and
- * a project skill of one name shows only one of them, and Claude Code shows
- * the user one, which would hide the project's.
- */
-export const PROJECT_SKILL_NAME = 'astryx-project';
+// The project skills folders and the project skill's name live in the leaf
+// module, so the setup check reads them without loading this one.
+export {PROJECT_SKILL_FOLDERS, PROJECT_SKILL_NAME} from './agent-doc-state.mjs';
 
 /** The computer-level skill's name and folder name. */
 export const COMPUTER_SKILL_NAME = 'astryx';

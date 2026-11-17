@@ -122,8 +122,26 @@ export function holdsAstryxBlock(content) {
 }
 
 /**
+ * The project skills folders `init --to skills` writes, relative to the
+ * project root: the shared folder most agents read, and Claude Code's own.
+ */
+export const PROJECT_SKILL_FOLDERS = Object.freeze([
+  path.join('.agents', 'skills'),
+  path.join('.claude', 'skills'),
+]);
+
+/**
+ * The project skill's name, which is also its folder's name. It differs from
+ * the computer-level skill's (`astryx`): an agent that reads both a user and
+ * a project skill of one name shows only one of them, and Claude Code shows
+ * the user one, which would hide the project's.
+ */
+export const PROJECT_SKILL_NAME = 'astryx-project';
+
+/**
  * Single source of truth for "is Astryx set up in this project?" — true when any
- * agent-doc file already holds an Astryx block, i.e. `init` / `agent-docs` has
+ * agent-doc file already holds an Astryx block, or a project skills folder
+ * holds the Astryx project skill (`init --to skills`), i.e. `init` has
  * run. Reused by the init & upgrade commands, the per-command setup nudge
  * (enforcement layer 3), and the cli postinstall nudge (layer 2). Core's
  * postinstall (separate package, layer 1) mirrors the same marker contract.
@@ -140,6 +158,14 @@ export function isAstryxInitialized(targetDir = process.cwd()) {
       }
     } catch {
       // Unreadable file — ignore and keep checking the others.
+    }
+  }
+  for (const folder of PROJECT_SKILL_FOLDERS) {
+    try {
+      const file = path.join(targetDir, folder, PROJECT_SKILL_NAME, 'SKILL.md');
+      if (fs.readFileSync(file, 'utf-8').includes(MARKER_START)) return true;
+    } catch {
+      // No project skill there.
     }
   }
   return false;

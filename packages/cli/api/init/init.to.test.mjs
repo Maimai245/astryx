@@ -205,7 +205,7 @@ describe('init --to skills', () => {
     expect(data.docsChanges.filter(c => c.change === 'removed')).toEqual([]);
   });
 
-  it('keeps the old skill place when the new folder place is a person\'s own', async () => {
+  it('keeps the old skill place, and what is saved, when the new folder place is a person\'s own', async () => {
     await run({to: 'skills'});
     const own = path.join(project, 'team', 'astryx-project', 'SKILL.md');
     fs.mkdirSync(path.dirname(own), {recursive: true});
@@ -213,6 +213,8 @@ describe('init --to skills', () => {
     await run({to: './team'});
     expect(exists(SHARED)).toBe(true);
     expect(fs.readFileSync(own, 'utf8')).toBe('# mine\n');
+    expect(read('astryx.config.mjs')).toContain("'skills'");
+    expect(read('astryx.config.mjs')).not.toContain('./team');
   });
 
   it('keeps a skill file a person edited, and one Astryx did not write', async () => {
@@ -497,12 +499,19 @@ describe('a project that keeps its guidance as a skill', () => {
     expect(fs.readdirSync(project).sort()).toEqual(['.claude', '.git', 'package.json']);
   });
 
-  it('keeps the skill places when the block it moves to fails to write', async () => {
+  it('keeps the skill places, and what is saved, when the block it moves to fails to write', async () => {
     await run({to: 'skills'});
     fs.symlinkSync(path.join(home, 'elsewhere.md'), path.join(project, 'AGENTS.md'));
     const data = await run({to: 'agents-md'});
     expect(data.docsError?.kind).toBe('path-safety');
     expect(exists(SHARED)).toBe(true);
+    expect(read('astryx.config.mjs')).toContain("'skills'");
+  });
+
+  it('a set-up project is still set up after init writes only a folder outside it', async () => {
+    await run({});
+    const data = await run({to: path.join(home, 'team')});
+    expect(data.nextSteps).toBe(false);
   });
 });
 

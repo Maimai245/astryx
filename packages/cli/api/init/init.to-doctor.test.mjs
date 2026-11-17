@@ -3,7 +3,8 @@
 /**
  * @file Doctor's agent-docs check in a project that keeps its Astryx
  * guidance as a skill (`init --to skills`): the saved skill files count as
- * the project's agent docs.
+ * the project's agent docs, judged by their state, and the setup check
+ * counts them.
  */
 
 import * as fs from 'node:fs';
@@ -12,6 +13,7 @@ import * as path from 'node:path';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import {init} from './init.mjs';
 import {runChecks} from '../doctor/doctor.mjs';
+import {isAstryxInitialized} from '../../foundation/agent-docs/agent-doc-state.mjs';
 
 let home = '';
 let project = '';
@@ -42,10 +44,33 @@ it('passes agent-docs on the saved skill files', async () => {
   expect(check?.message).toContain('.agents/skills/astryx-project/SKILL.md');
 });
 
-it('still reports no agent docs when the saved skill files are gone', async () => {
+it('passes when the project keeps its own AGENTS.md text beside the skill', async () => {
+  fs.writeFileSync(path.join(project, 'AGENTS.md'), '# Our rules\n\nBe kind.\n');
+  await init({to: 'skills'}, {cwd: project});
+  const report = await runChecks({cwd: project});
+  expect(report.checks.find(each => each.id === 'agent-docs')).toMatchObject({status: 'pass'});
+});
+
+it('warns, with init as the fix, when the saved skill files are gone', async () => {
   await init({to: 'skills'}, {cwd: project});
   fs.rmSync(path.join(project, '.agents'), {recursive: true});
   fs.rmSync(path.join(project, '.claude'), {recursive: true});
   const report = await runChecks({cwd: project});
+  const check = report.checks.find(each => each.id === 'agent-docs');
+  expect(check).toMatchObject({status: 'warn'});
+  expect(check?.fix).toContain('init');
+});
+
+it('a skill file without the Astryx markers does not count', async () => {
+  await init({to: 'skills'}, {cwd: project});
+  for (const folder of ['.agents', '.claude']) {
+    fs.writeFileSync(path.join(project, folder, 'skills', 'astryx-project', 'SKILL.md'), '# mine\n');
+  }
+  const report = await runChecks({cwd: project});
   expect(report.checks.find(each => each.id === 'agent-docs')).toMatchObject({status: 'info'});
+});
+
+it('the setup check counts the project skill', async () => {
+  await init({to: 'skills'}, {cwd: project});
+  expect(isAstryxInitialized(project)).toBe(true);
 });

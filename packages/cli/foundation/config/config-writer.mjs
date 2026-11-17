@@ -222,10 +222,12 @@ function newConfigText(fields) {
  * @param {ReadonlyArray<readonly [string, string | readonly string[] | null]>} fields
  *   each a top-level key or a dotted path (`experimental.iconSet`), and its
  *   value
+ * @param {{check?: boolean}} [options] `check`: find every reason the write
+ *   would be refused, and write nothing
  * @returns {{file: string, created: boolean, previous: Array<string | string[] | null>, changed: boolean}}
  *   `previous`: each field's value before the write, in the order given
  */
-export function setConfigValues(projectDir, fields) {
+export function setConfigValues(projectDir, fields, {check = false} = {}) {
   const existing = CONFIG_BASENAMES.map(name =>
     path.join(projectDir, name),
   ).find(file => fs.existsSync(file));
@@ -240,7 +242,7 @@ export function setConfigValues(projectDir, fields) {
     if (set.length === 0)
       return {file, created: false, previous, changed: false};
     assertWritable(projectDir, file);
-    writeAtomically(file, newConfigText(set));
+    if (!check) writeAtomically(file, newConfigText(set));
     return {file, created: true, previous, changed: true};
   }
   assertWritable(projectDir, existing);
@@ -343,7 +345,7 @@ export function setConfigValues(projectDir, fields) {
   }
   let next = ast.toSource({quote: 'single', reuseWhitespace: true});
   if (source.endsWith('\n') && !next.endsWith('\n')) next += '\n';
-  writeAtomically(existing, next);
+  if (!check) writeAtomically(existing, next);
   return {file: existing, created: false, previous, changed: true};
 }
 

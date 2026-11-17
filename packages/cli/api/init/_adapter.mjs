@@ -121,15 +121,17 @@ export function skillProjectRoot(cwd) {
 
 /**
  * Save the project places in `skills.to` of the project's config: no key for
- * the default alone, and no config file when nothing else is left in it. A protected or dynamic config throws, before any file
- * is written.
+ * the default alone, and no config file when nothing else is left in it. A
+ * protected or dynamic config throws, before any file is written.
  * @param {string} projectRoot
  * @param {readonly import('../../foundation/agent-docs/skill-places.mjs').SkillPlace[]} places
+ * @param {{check?: boolean}} [options] `check`: throw as the save would, and
+ *   write nothing, so a run can stop before it changes any place
  */
-export function saveProjectPlaces(projectRoot, places) {
+export function saveProjectPlaces(projectRoot, places, {check = false} = {}) {
   let written;
   try {
-    written = setConfigValues(projectRoot, [['skills.to', projectPlacesValue(places)]]);
+    written = setConfigValues(projectRoot, [['skills.to', projectPlacesValue(places)]], {check});
   } catch (error) {
     // A protected config keeps the stable code every consumer-file writer
     // uses (spec:AST-040 FR4, FR6).
@@ -147,6 +149,7 @@ export function saveProjectPlaces(projectRoot, places) {
   // A config left holding nothing says what no config says, so it goes, as
   // after a move back to the default place in a project init gave a config.
   if (
+    !check &&
     written.changed &&
     /^export default \{\};?\s*$/u.test(fs.readFileSync(written.file, 'utf8'))
   ) {

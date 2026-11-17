@@ -22,7 +22,10 @@ import {CLI_ROOT} from '../../../foundation/fs/paths.mjs';
 import {PathSafetyError, assertWithin} from '../../../foundation/fs/path-safety.mjs';
 import {getCliInvocation} from '../../../foundation/env/package-manager.mjs';
 import {isOutsideProject} from '../../../foundation/env/project-scope.mjs';
-import {AGENT_DOC_PATHS} from '../../../foundation/agent-docs/agent-doc-state.mjs';
+import {
+  AGENT_DOC_PATHS,
+  isAstryxInitialized,
+} from '../../../foundation/agent-docs/agent-doc-state.mjs';
 import {
   addComputerSkillFolders,
   assertPlaceWithin,
@@ -364,12 +367,13 @@ async function applyPlaces(cwd, options, invocation, data, given) {
     data.docsError = {kind: 'install-failed', message: given.homeRefusal};
     return applyComputerPlaces(places, data, record);
   }
-  // What can still stop the run comes before any place changes: the skill
-  // renders, and the config takes the record.
+  // What can stop the run comes before any place changes: the skill renders,
+  // and the config can take the record, which is saved once a new place
+  // holds the guidance.
   const text =
     skillPlaces.length > 0 && projectRoot ? await projectSkillText(projectRoot) : null;
   if (previous && projectRoot && projectPlaces.length > 0) {
-    saveProjectPlaces(projectRoot, projectPlaces);
+    saveProjectPlaces(projectRoot, projectPlaces, {check: true});
   }
   // The new places are written before the old ones are cleared, so the
   // project never goes without the guidance.
@@ -398,18 +402,22 @@ async function applyPlaces(cwd, options, invocation, data, given) {
           : 'stale';
     }
   }
-  // The old places are cleared only when a new one holds the guidance: when
-  // every new place is a person's own file, the old ones stay, so the project
-  // never ends with no Astryx text.
+  // The move happens only when a new place holds the guidance: when every
+  // new place is a person's own file, or the block write failed, the saved
+  // places and the old files stay as they were, so the project never ends
+  // with no Astryx text and later runs keep refreshing the old place.
   const blockStays = projectPlaces.some(place => place.kind === 'agents-md');
-  if (leaving.length > 0 && !(blockStays && data.docsError == null) && !landed) {
+  const blockLanded = blockStays && data.docsError == null;
+  const moved = blockLanded || landed;
+  if (previous && projectRoot && projectPlaces.length > 0 && !moved) {
     logger.warn(
-      `Note: Kept the Astryx guidance in ${leaving.map(savedName).join(', ')}: every new place holds a file Astryx did not write or one you edited, so nothing else holds it yet.`,
+      `Note: Kept the Astryx guidance where it was (${previous.map(savedName).join(', ')}), and saved no new place: ${blockStays && data.docsError ? 'the Astryx block could not be written' : 'every new place holds a file Astryx did not write or one you edited'}, so no new place holds it yet.`,
     );
   }
-  // A block write that failed (data.docsError) holds no text either.
-  const blockLanded = blockStays && data.docsError == null;
-  for (const place of blockLanded || landed ? leaving : []) {
+  if (previous && projectRoot && projectPlaces.length > 0 && moved) {
+    saveProjectPlaces(projectRoot, projectPlaces);
+  }
+  for (const place of moved ? leaving : []) {
     if (place.kind !== 'agents-md') {
       record(place, removeSkillPlace(place, /** @type {string} */ (projectRoot)));
       continue;
@@ -708,7 +716,14 @@ export async function run(options = {}, {cwd = process.cwd(), places} = {}) {
   await applyPlaces(cwd, options, invocation, data, /** @type {InitPlaces} */ (checked));
   // A project whose agent docs were all current before this run is set up:
   // the install steps would only repeat setup.
-  const setUp = !outside && data.agentDocsStatus === 'current';
+  // A run that writes only computer places leaves the project as it is, so
+  // a set-up project is still set up.
+  const onlyComputer =
+    places != null && places.places.every(place => place.scope === 'computer');
+  const setUp =
+    !outside &&
+    (data.agentDocsStatus === 'current' ||
+      (onlyComputer && isAstryxInitialized(agentDocsTargetDir(cwd))));
   data.nextSteps = !outside && !setUp;
   logger.log('');
   logger.log(

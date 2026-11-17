@@ -73,7 +73,7 @@ export const doc = {
       name: 'options.to',
       type: 'string | string[]',
       description:
-        'Where the Astryx skill goes, one place, a comma list, or several: `agents-md` (the managed block, the default), `skills` (`.agents/skills/astryx-project/SKILL.md` and a byte-identical copy in `.claude/skills/astryx-project` at the project root), `user` (the computer-level skill, the same as `user`), or a folder written as a path (`./team`, `~/team`): one in the project gets `<folder>/astryx-project/SKILL.md`, any other the computer-level skill at `<folder>/astryx/SKILL.md`. ' +
+        'Where the Astryx skill goes, one place, a comma list, or several: `agents-md` (the managed block, the default), `skills` (`.agents/skills/astryx-project/SKILL.md` and a byte-identical copy in `.claude/skills/astryx-project` at the project root), `user` (the computer-level skill, the same as the `user` option), or a folder written as a path (`./team`, `~/team`): one in the project gets `<folder>/astryx-project/SKILL.md`, any other the computer-level skill at `<folder>/astryx/SKILL.md`. ' +
         "The project places are saved in astryx.config `skills.to`, so a later `init` writes the same places; a folder outside the project is saved in the settings file, and the CLI installed for the computer refreshes its copy while it is there. Naming project places moves the project to them: the old places are cleared once a new one holds the text. " +
         'An edited skill file, or one Astryx did not write, is kept. A project root in the home folder or a settings folder in it takes no project place, as it takes no agent docs.',
     },
