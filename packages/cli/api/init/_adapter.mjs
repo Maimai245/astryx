@@ -48,7 +48,6 @@ import {
   recordComputerSkillFolders,
 } from '../../foundation/env/user-settings.mjs';
 import {setConfigValues} from '../../foundation/config/config-writer.mjs';
-import {PathSafetyError, assertWithin} from '../../foundation/fs/path-safety.mjs';
 import {AstryxError} from '../error.mjs';
 import {ERROR_CODES} from '../../foundation/response/error-codes.mjs';
 
@@ -58,6 +57,7 @@ export {
   removeSkillPlace,
   writeSkillPlace,
 } from '../../foundation/agent-docs/skill-place-files.mjs';
+import {skillPlaceEscape} from '../../foundation/agent-docs/skill-place-files.mjs';
 
 // What the run leaf reads before it writes agent docs: the state of the files
 // it is about to write.
@@ -162,18 +162,8 @@ export function saveProjectPlaces(projectRoot, places, {check = false} = {}) {
  * @param {string} projectRoot
  */
 export function assertPlaceWithin(place, projectRoot) {
-  for (const file of placeSkillFiles(place, projectRoot)) {
-    try {
-      assertWithin(path.relative(projectRoot, file), projectRoot, {label: 'skill file'});
-    } catch (err) {
-      if (!(err instanceof PathSafetyError)) throw err;
-      throw new AstryxError(
-        `${err.message} Astryx writes the project skill only inside the project; make that folder a real folder in the project, or choose another place with \`--to\`.`,
-        undefined,
-        ERROR_CODES.ERR_PATH_TRAVERSAL,
-      );
-    }
-  }
+  const escape = skillPlaceEscape(place, projectRoot);
+  if (escape) throw new AstryxError(escape, undefined, ERROR_CODES.ERR_PATH_TRAVERSAL);
 }
 
 /**

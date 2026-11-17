@@ -1029,13 +1029,37 @@ export function checkSkillPlaces(ctx) {
       fix: `Delete ${report.plainNamed.length === 1 ? 'it' : 'them'}; ${init('--to skills')} writes the project skill as \`astryx-project\`.`,
     };
   }
-  const doubled = report.blockFiles.length > 0 && report.skillFiles.length > 0;
+  const savesBlock = report.places.includes('agents-md');
+  const savesSkill = report.places.some(place => place !== 'agents-md');
+  // Both saved is the person's choice: the note in the pass line says so.
+  const doubled =
+    report.blockFiles.length > 0 && report.skillFiles.length > 0 && !(savesBlock && savesSkill);
   if (doubled) {
     return {
       ...base,
       status: 'warn',
       message: `The Astryx guidance is here twice: as the block in ${report.blockFiles.join(', ')} and as the skill in ${report.skillFiles.join(', ')}, so agents read it twice.`,
-      fix: `Keep one place: ${init(`--to ${saved}`)} moves the project to its saved places and removes the other.`,
+      fix: savesSkill
+        ? `The project saves ${saved}: remove the Astryx block from ${report.blockFiles.join(', ')} by hand, or run ${init('--to agents-md')} to keep only the block (it removes the skill copies).`
+        : `The project saves agents-md: delete ${report.skillFiles.join(', ')}, or run ${init('--to skills')} to keep only the skill (it removes the block).`,
+    };
+  }
+  // The two copies of a place are one skill: one a person's own and the other
+  // Astryx's means agents read two different texts.
+  const split = [...new Set(report.files.map(file => file.place))].filter(place => {
+    const states = report.files.filter(file => file.place === place).map(file => file.state);
+    return (
+      states.some(state => state === 'edited' || state === 'foreign') &&
+      states.some(state => state === 'current' || state === 'differs')
+    );
+  });
+  if (split.length > 0) {
+    const files = report.files.filter(file => split.includes(file.place));
+    return {
+      ...base,
+      status: 'warn',
+      message: `The copies of ${split.join(', ')} differ: ${files.map(file => `${file.path} (${file.state === 'edited' ? 'edited' : file.state === 'foreign' ? 'not written by Astryx' : 'Astryx\'s'})`).join(', ')}, so agents read different texts.`,
+      fix: 'Make the copies the same: copy your file over the other, or delete both and run ' + init('') + '.',
     };
   }
   const missing = report.files.filter(file => file.state === 'absent');
@@ -1044,6 +1068,10 @@ export function checkSkillPlaces(ctx) {
   const keptNote =
     kept.length > 0
       ? ` Kept as they are (edited, or not written by Astryx): ${kept.map(file => file.path).join(', ')}.`
+      : '';
+  const bothNote =
+    report.blockFiles.length > 0 && report.skillFiles.length > 0
+      ? ` The project saves both the block and the skill (${saved}), so agents that read both get it twice.`
       : '';
   const codexNote = report.computerSkill && report.skillFiles.length > 0
     ? ' This computer also has the computer-level `astryx` skill, so Codex lists both skills.'
@@ -1057,7 +1085,7 @@ export function checkSkillPlaces(ctx) {
       ...base,
       status: 'warn',
       message: `${(missingNote + staleNote).trim()}${keptNote}${codexNote}`,
-      fix: `Run ${init('')} to write the saved places (\`astryx upgrade --apply\` also refreshes them).`,
+      fix: `Run ${init('')} to write the saved places (\`astryx upgrade --apply\` also refreshes them after an Astryx update).`,
     };
   }
   const current = report.files.filter(file => file.state === 'current');
@@ -1066,8 +1094,8 @@ export function checkSkillPlaces(ctx) {
     status: kept.length > 0 && current.length === 0 ? 'info' : 'pass',
     message:
       current.length > 0
-        ? `The Astryx skill matches this release in ${current.map(file => file.path).join(', ')}.${keptNote}${codexNote}`
-        : `Saved places: ${report.places.join(', ')}.${keptNote}${codexNote}`,
+        ? `The Astryx skill matches this release in ${current.map(file => file.path).join(', ')}.${keptNote}${bothNote}${codexNote}`
+        : `Saved places: ${report.places.join(', ')}.${keptNote}${bothNote}${codexNote}`,
   };
 }
 

@@ -42,13 +42,13 @@
  * - `none`          — nothing to do (block already matches expected content).
  *
  * @typedef {object} AgentDocsSummary
- * @property {'missing' | 'stale' | 'current'} status
+ * @property {'missing' | 'stale' | 'current'} status The Astryx block, and the skill files of the saved skill places: `stale` when either needs a refresh. In a project that saves no `agents-md` place and has no block, the skill files alone (`missing` when none is there).
  * @property {string} installedVersion Installed core version the block should reflect.
  * @property {string[]} fromVersions Distinct stale block versions found (the "from" side of the refresh).
- * @property {string[]} files Files rewritten (apply) or that would be rewritten (dry-run), relative to the folder the command ran in.
- * @property {boolean} refreshed True only when a block was actually rewritten (apply mode).
- * @property {'refreshed' | 'would-refresh' | 'nudge-init' | 'error' | 'none'} action
- * @property {UpgradeSkillFile[]} skills One row per file of the project's saved skill places (astryx.config `skills.to`: `skills` or a folder); empty when the project saves only the AGENTS.md block. When the project saves no `agents-md` place, the block is not checked, and `status` and `action` describe the skill files alone.
+ * @property {string[]} files Agent files whose block was rewritten (apply) or would be (dry-run), relative to the folder the command ran in; skill files are in `skills`.
+ * @property {boolean} refreshed True only when a block or a skill file was actually rewritten (apply mode).
+ * @property {'refreshed' | 'would-refresh' | 'nudge-init' | 'error' | 'none'} action `refreshed` / `would-refresh`: a block or a skill file was, or would be, rewritten. `nudge-init`: the project saves `agents-md` and has no block. `error`: a block or a skill place could not be refreshed (as a place linked out of the project).
+ * @property {UpgradeSkillFile[]} skills One row per file of the project's saved skill places (astryx.config `skills.to`: `skills` or a folder); empty when the project saves only the AGENTS.md block. An Astryx block is checked wherever it is.
  */
 
 /**
@@ -60,7 +60,7 @@
  * @property {string} path The file, relative to the folder the command ran in.
  * @property {string} place The place, as astryx.config saves it: `skills` or `./<folder>`.
  * @property {'current' | 'would-create' | 'would-update' | 'created' | 'updated' | 'kept'} action
- * @property {'edited' | 'not-astryx'} [reason] Only on `kept`: a person edited it since Astryx wrote it, or Astryx did not write it.
+ * @property {'edited' | 'not-astryx' | 'pair-kept'} [reason] Only on `kept`: a person edited it since Astryx wrote it, Astryx did not write it, or (`pair-kept`) another copy of the same place is a person's, so the copies are left as they are together.
  */
 
 /**

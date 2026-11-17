@@ -2,7 +2,8 @@
 
 /**
  * @file Doctor and the skill places: the `skill-places` check (current,
- * missing or stale, kept, doubled, a project skill named `astryx`), its
+ * missing or stale, kept, copies that differ, doubled or saved both, a
+ * project skill named `astryx`, a project at the home folder), its
  * absence in a project that keeps only the AGENTS.md block, and the
  * agent-docs check of a project that keeps its guidance as a skill.
  */
@@ -59,7 +60,7 @@ describe('the skill-places check', () => {
   it('passes when every saved file holds this release, and agent-docs points at it', async () => {
     await init({to: 'skills'}, {cwd: project});
     expect(await check('skill-places')).toMatchObject({status: 'pass'});
-    expect((await check('agent-docs'))?.message).toContain('skills.to: skills');
+    expect((await check('agent-docs'))?.message).toContain('skills.to');
   });
 
   it('warns about a missing copy and names the command that writes it', async () => {
@@ -80,6 +81,30 @@ describe('the skill-places check', () => {
     const result = await check('skill-places');
     expect(result).toMatchObject({status: 'warn'});
     expect(result?.message).toContain('twice');
+    expect(result?.fix).toContain(`delete ${SHARED}`);
+  });
+
+  it('notes, without warning, a block and a skill the project saves both of', async () => {
+    await init({to: 'agents-md,skills'}, {cwd: project});
+    const result = await check('skill-places');
+    expect(result).toMatchObject({status: 'pass'});
+    expect(result?.message).toContain('saves both');
+  });
+
+  it('warns when the two copies of a place differ', async () => {
+    await init({to: 'skills'}, {cwd: project});
+    fs.appendFileSync(path.join(project, SHARED), 'my note\n');
+    const result = await check('skill-places');
+    expect(result).toMatchObject({status: 'warn'});
+    expect(result?.message).toContain('copies of skills differ');
+  });
+
+  it('never calls the computer-level skill a project skill in a project at the home folder', async () => {
+    const home = /** @type {string} */ (process.env.HOME);
+    await init({user: true}, {cwd: project});
+    fs.writeFileSync(path.join(home, 'package.json'), JSON.stringify({name: 'home'}));
+    const report = await runChecks({cwd: home});
+    expect(report.checks.find(each => each.id === 'skill-places')).toBeUndefined();
   });
 
   it('warns about a project skill named astryx', async () => {
@@ -92,7 +117,7 @@ describe('the skill-places check', () => {
     expect(result?.message).toContain('.claude/skills/astryx');
   });
 
-  it('reports a kept file without failing', () => {
+  it('reports kept files without failing', () => {
     const result = checkSkillPlaces(
       /** @type {any} */ ({
         cwd: project,
@@ -100,7 +125,7 @@ describe('the skill-places check', () => {
           places: ['skills'],
           files: [
             {path: SHARED, place: 'skills', state: 'edited'},
-            {path: '.claude/skills/astryx-project/SKILL.md', place: 'skills', state: 'current'},
+            {path: '.claude/skills/astryx-project/SKILL.md', place: 'skills', state: 'edited'},
           ],
           renderError: null,
           blockFiles: [],
@@ -110,7 +135,7 @@ describe('the skill-places check', () => {
         },
       }),
     );
-    expect(result).toMatchObject({status: 'pass'});
+    expect(result).toMatchObject({status: 'info'});
     expect(result?.message).toContain('Kept as they are');
     expect(result?.message).toContain('Codex lists both');
   });

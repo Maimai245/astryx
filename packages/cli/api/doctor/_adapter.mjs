@@ -48,7 +48,11 @@ import {
 } from '../../foundation/env/user-settings.mjs';
 import {managedFileState} from '../../foundation/agent-docs/managed-skill-file.mjs';
 import * as fs from 'node:fs';
-import {resolveAgentDocsRoot} from '../../foundation/agent-docs/agent-docs-target.mjs';
+import {
+  AgentDocsHomeError,
+  assertAgentDocsTarget,
+  resolveAgentDocsRoot,
+} from '../../foundation/agent-docs/agent-docs-target.mjs';
 import {
   AGENT_DOC_PATHS,
   holdsAstryxBlock,
@@ -1081,7 +1085,17 @@ export async function readSkillPlaces(cwd) {
       return null;
     }
   };
-  const places = await readProjectPlaces(root);
+  // In the home folder or a settings folder, the skill folders are the
+  // computer's (the computer-level skill and its links), not a project's:
+  // nothing there is scanned as a project place (INV31).
+  let atHome = false;
+  try {
+    assertAgentDocsTarget(root);
+  } catch (err) {
+    if (!(err instanceof AgentDocsHomeError)) throw err;
+    atHome = true;
+  }
+  const places = atHome ? [] : await readProjectPlaces(root);
   const skillPlaces = places.filter(place => place.kind === 'skills' || place.kind === 'folder');
   /** @type {SkillPlacesReport['files']} */
   const files = [];
@@ -1101,18 +1115,18 @@ export async function readSkillPlaces(cwd) {
   const blockFiles = AGENT_DOC_PATHS.map(rel => path.join(root, rel))
     .filter(file => holdsAstryxBlock(read(file) ?? ''))
     .map(shown);
-  const skillFiles = PROJECT_SKILL_FOLDERS.map(folder =>
+  const skillFiles = (atHome ? [] : PROJECT_SKILL_FOLDERS).map(folder =>
     path.join(root, folder, PROJECT_SKILL_NAME, 'SKILL.md'),
   )
     .filter(file => read(file) != null)
     .map(shown);
-  const plainNamed = PROJECT_SKILL_FOLDERS.map(folder =>
+  const plainNamed = (atHome ? [] : PROJECT_SKILL_FOLDERS).map(folder =>
     path.join(root, folder, COMPUTER_SKILL_NAME),
   )
     .filter(dir => fs.existsSync(path.join(dir, 'SKILL.md')))
     .map(shown);
   return {
-    places: places.map(savedName),
+    places: atHome ? ['agents-md'] : places.map(savedName),
     files,
     renderError,
     blockFiles,

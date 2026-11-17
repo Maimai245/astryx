@@ -4,8 +4,10 @@
  * @file `astryx upgrade` and the saved skill places (astryx.config
  * `skills.to`): a dry run names each file it would write, `--apply` writes
  * this release's project skill to every saved place with the two copies of
- * the `skills` place byte for byte the same, an edited file is kept, and a
- * project that saves no `agents-md` place is not told to add the block.
+ * the `skills` place written together or not at all, nothing is written
+ * through a folder linked out of the project, a block that is there is
+ * refreshed whatever is saved, and a project that saves no `agents-md` place
+ * is not told to add the block.
  */
 
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
@@ -88,12 +90,39 @@ describe('upgrade and the skills place', () => {
     expect(res.data.agentDocs.skills.map(row => row.action)).toEqual(['current', 'current']);
   });
 
-  it('keeps an edited file', async () => {
+  it('keeps an edited file, and the other copy with it, so the copies never part', async () => {
     save('skills');
     write(SHARED, `${olderSkill()}my note\n`);
+    write(CLAUDE, olderSkill());
     const res = await upgrade({from: '0.0.15', apply: true}, {cwd: dir});
-    expect(res.data.agentDocs.skills[0]).toEqual({path: SHARED, place: 'skills', action: 'kept', reason: 'edited'});
+    expect(res.data.agentDocs.skills).toEqual([
+      {path: SHARED, place: 'skills', action: 'kept', reason: 'edited'},
+      {path: CLAUDE, place: 'skills', action: 'kept', reason: 'pair-kept'},
+    ]);
     expect(read(SHARED)).toMatch(/my note\n$/u);
+    expect(read(CLAUDE)).toBe(olderSkill());
+  });
+
+  it('writes nothing through a skills folder linked out of the project', async () => {
+    save('skills');
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'astryx-upgrade-skills-out-'));
+    try {
+      fs.symlinkSync(outside, path.join(dir, '.claude'), 'dir');
+      const res = await upgrade({from: '0.0.15', apply: true}, {cwd: dir});
+      expect(res.data.agentDocs.action).toBe('error');
+      expect(fs.readdirSync(outside)).toEqual([]);
+      expect(fs.existsSync(path.join(dir, SHARED))).toBe(false);
+    } finally {
+      fs.rmSync(outside, {recursive: true, force: true});
+    }
+  });
+
+  it('refreshes a block that is still there when only the skill is saved', async () => {
+    save('skills');
+    write('AGENTS.md', `# Doc\n\n${generateCompressedIndex('0.0.1')}\n`);
+    const res = await upgrade({from: '0.0.15', apply: true}, {cwd: dir});
+    expect(res.data.agentDocs.files).toContain('AGENTS.md');
+    expect(read('AGENTS.md')).toMatch(/Astryx v0\.0\.15 ·/u);
   });
 
   it('refreshes the block and a folder place together', async () => {

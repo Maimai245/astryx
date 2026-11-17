@@ -2,19 +2,20 @@
 
 /**
  * @file The skill places on disk: the project places a config saves, and the
- * skill files each place holds, read, written, and removed under the managed
- * file rules (`managed-skill-file.mjs`). `init`, `upgrade`, `doctor`, and the
- * global copy's background step share it.
+ * skill files each place holds, checked to stay inside the project, read,
+ * written, and removed under the managed file rules
+ * (`managed-skill-file.mjs`). `init`, `upgrade`, and `doctor` share it.
  *
  * @input  a project root, a place, the text this release renders for it
  * @output the saved places, each file's state, and the write and remove rows
  * @position foundation/agent-docs — read by the init, upgrade, and doctor
- *   adapters and by the background step
+ *   adapters
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {findConfigPath} from '../config/config-path.mjs';
+import {PathSafetyError, assertWithin} from '../fs/path-safety.mjs';
 import {loadModuleWithParser} from '../fs/module-loader.mjs';
 import {parseConfig} from '../../authoring/config/parse.mjs';
 import {placeSkillFiles, savedProjectPlaces} from './skill-places.mjs';
@@ -106,6 +107,28 @@ function removeEmptyFolders(dir, stop) {
     }
     at = path.dirname(at);
   }
+}
+
+/**
+ * Why a project place cannot be written: one of its skill files resolves
+ * outside the project, as through a skills folder linked out of it (such as
+ * `.claude` linked to `~/.claude`). Null when every file stays inside.
+ * @param {import('./skill-places.mjs').SkillPlace} place
+ * @param {string} projectRoot
+ * @returns {string | null}
+ */
+export function skillPlaceEscape(place, projectRoot) {
+  for (const file of placeSkillFiles(place, projectRoot)) {
+    try {
+      assertWithin(path.relative(projectRoot, file), projectRoot, {label: 'skill file'});
+    } catch (err) {
+      if (err instanceof PathSafetyError) {
+        return `${err.message} Astryx writes the project skill only inside the project; make that folder a real folder in the project, or choose another place with \`astryx init --to\`.`;
+      }
+      throw err;
+    }
+  }
+  return null;
 }
 
 /**
