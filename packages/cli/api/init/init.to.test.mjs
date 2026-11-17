@@ -508,6 +508,22 @@ describe('a project that keeps its guidance as a skill', () => {
     expect(read('astryx.config.mjs')).toContain("'skills'");
   });
 
+  it('a set-up project moved to the skills folders prints no getting-started steps', async () => {
+    await run({});
+    const data = await run({to: 'skills'});
+    expect(data.nextSteps).toBe(false);
+  });
+
+  it('a linked-out GEMINI.md it leaves as it is does not stop the move to the block', async () => {
+    await run({to: 'skills'});
+    fs.symlinkSync(path.join(home, 'gemini.md'), path.join(project, 'GEMINI.md'));
+    const data = await run({to: 'agents-md'});
+    expect(data.docsError?.kind).toBe('install-failed');
+    expect(exists('AGENTS.md')).toBe(true);
+    expect(exists(SHARED)).toBe(false);
+    expect(exists('astryx.config.mjs')).toBe(false);
+  });
+
   it('a set-up project is still set up after init writes only a folder outside it', async () => {
     await run({});
     const data = await run({to: path.join(home, 'team')});

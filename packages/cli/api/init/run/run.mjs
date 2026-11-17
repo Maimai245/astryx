@@ -407,11 +407,13 @@ async function applyPlaces(cwd, options, invocation, data, given) {
   // places and the old files stay as they were, so the project never ends
   // with no Astryx text and later runs keep refreshing the old place.
   const blockStays = projectPlaces.some(place => place.kind === 'agents-md');
-  const blockLanded = blockStays && data.docsError == null;
+  // The block holds the guidance once AGENTS.md (or the files named) took
+  // it; a linked-out file it only left as it is does not undo that.
+  const blockLanded = blockStays && data.docsWritten.length > 0 && data.docsError?.kind !== 'path-safety';
   const moved = blockLanded || landed;
   if (previous && projectRoot && projectPlaces.length > 0 && !moved) {
     logger.warn(
-      `Note: Kept the Astryx guidance where it was (${previous.map(savedName).join(', ')}), and saved no new place: ${blockStays && data.docsError ? 'the Astryx block could not be written' : 'every new place holds a file Astryx did not write or one you edited'}, so no new place holds it yet.`,
+      `Note: Kept the Astryx guidance where it was (${previous.map(savedName).join(', ')}), and saved no new place: ${blockStays && !blockLanded ? `the Astryx block could not be written${data.docsError ? ` (${data.docsError.message})` : ''}` : 'every new place holds a file Astryx did not write or one you edited'}, so no new place holds it yet.`,
     );
   }
   if (previous && projectRoot && projectPlaces.length > 0 && moved) {
@@ -652,6 +654,9 @@ export function parseFeatures(options) {
 export async function run(options = {}, {cwd = process.cwd(), places} = {}) {
   const invocation = getCliInvocation();
 
+  // Whether the project was set up before this run: a `--to` run that moves
+  // a set-up project keeps it set up, so it prints no getting-started steps.
+  const setUpBefore = places != null && isAstryxInitialized(agentDocsTargetDir(cwd));
   // Non-interactive feature install: --features or --all.
   const features = parseFeatures(options);
   // The places are checked before any feature writes anything.
@@ -716,14 +721,9 @@ export async function run(options = {}, {cwd = process.cwd(), places} = {}) {
   await applyPlaces(cwd, options, invocation, data, /** @type {InitPlaces} */ (checked));
   // A project whose agent docs were all current before this run is set up:
   // the install steps would only repeat setup.
-  // A run that writes only computer places leaves the project as it is, so
-  // a set-up project is still set up.
-  const onlyComputer =
-    places != null && places.places.every(place => place.scope === 'computer');
-  const setUp =
-    !outside &&
-    (data.agentDocsStatus === 'current' ||
-      (onlyComputer && isAstryxInitialized(agentDocsTargetDir(cwd))));
+  // A `--to` run that only moves or adds places leaves a set-up project set
+  // up.
+  const setUp = !outside && (data.agentDocsStatus === 'current' || setUpBefore);
   data.nextSteps = !outside && !setUp;
   logger.log('');
   logger.log(
