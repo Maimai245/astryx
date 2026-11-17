@@ -763,6 +763,50 @@ describe('render(): every write stays inside the current folder', () => {
     expect(fs.readFileSync(path.join(cwd, 'again.html'), 'utf8')).toContain('Home header');
   }, 60_000);
 
+  it('never edits a tsconfig.json: a reverse that needs an alias entry names the entry, the file it belongs in, and why', async () => {
+    put('tsc-src/tsconfig.json', '{"compilerOptions": {"baseUrl": ".", "paths": {"@/*": ["./src/*"]}}}\n');
+    put('tsc-src/package.json', '{"name":"tsc-src","private":true}');
+    put('tsc-src/src/components/Header.tsx', 'export function Header() { return <p>Sent header</p>; }\n');
+    put('tsc-src/src/app/page.tsx', "import {Header} from '@/components/Header';\nexport default function Page() { return <Header />; }\n");
+    await render('tsc-src/src/app/page.tsx', {cwd: dir});
+    const sent = path.join(dir, 'tsc-src/src/app/page.html');
+    // A project whose config has other aliases, with a comment and its own layout, that no tool may rewrite.
+    const config = '{\n  // the project\'s own aliases\n  "compilerOptions": {"baseUrl": ".", "paths": {"$lib/*": ["./lib/*"]}},\n}\n';
+    put('tsc-to/package.json', '{"name":"tsc-to","private":true}');
+    put('tsc-to/tsconfig.json', config);
+    fs.copyFileSync(sent, path.join(dir, 'tsc-to/page.html'));
+    const cwd = path.join(dir, 'tsc-to');
+    const back = /** @type {any} */ (await render('page.html', {cwd, reverse: true}));
+    expect(back.data.aliased).toEqual({
+      config: 'tsconfig.json',
+      paths: {'$lib/*': ['./lib/*'], '@/*': ['./page-restored/*']},
+      imports: [{import: '@/components/Header', file: 'page-restored/components/Header.tsx'}],
+    });
+    expect(fs.readFileSync(path.join(cwd, 'tsconfig.json'), 'utf8')).toBe(config);
+    const {stdout} = await runCli(['experimental', 'render', '--reverse', 'page.html'], {cwd});
+    expect(stdout).toContain('through a path alias that does not reach it in this project');
+    expect(stdout).toContain('set the "paths" of tsconfig.json');
+    expect(stdout).toContain('"$lib/*": ["./lib/*"], "@/*": ["./page-restored-2/*"]');
+    expect(fs.readFileSync(path.join(cwd, 'tsconfig.json'), 'utf8')).toBe(config);
+    // The project's alias reaches a different file: that file and the config stay as they are, and the answer says why.
+    const aliased = '{"compilerOptions": {"baseUrl": ".", "paths": {"@/*": ["./src/*"]}}}\n';
+    const own = 'export function Header() { return <p>Own header</p>; }\n';
+    put('tsc-own/package.json', '{"name":"tsc-own","private":true}');
+    put('tsc-own/tsconfig.json', aliased);
+    put('tsc-own/src/components/Header.tsx', own);
+    fs.copyFileSync(sent, path.join(dir, 'tsc-own/page.html'));
+    const ownCwd = path.join(dir, 'tsc-own');
+    const differs = /** @type {any} */ (await render('page.html', {cwd: ownCwd, reverse: true}));
+    expect(differs.data.aliased.differs).toEqual([
+      {import: '@/components/Header', project: 'src/components/Header.tsx', exists: true, file: 'page-restored/components/Header.tsx'},
+    ]);
+    expect(differs.data.aliased.config).toBe('tsconfig.json');
+    const text = (await runCli(['experimental', 'render', '--reverse', 'page.html'], {cwd: ownCwd})).stdout;
+    expect(text).toContain('@/components/Header reaches src/components/Header.tsx in this project, which differs from the copy the page carries');
+    expect(fs.readFileSync(path.join(ownCwd, 'tsconfig.json'), 'utf8')).toBe(aliased);
+    expect(fs.readFileSync(path.join(ownCwd, 'src/components/Header.tsx'), 'utf8')).toBe(own);
+  }, 60_000);
+
   it('names the paths for an alias import from a file that records none', async () => {
     put('alias-old/tsconfig.json', '{"compilerOptions": {"baseUrl": ".", "paths": {"@/*": ["./src/*"]}}}\n');
     put('alias-old/package.json', '{"name":"alias-old","private":true}');
