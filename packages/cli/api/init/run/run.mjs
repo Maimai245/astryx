@@ -362,7 +362,7 @@ async function applyPlaces(cwd, options, invocation, data, given) {
   if (given.homeRefusal) {
     logger.warn(`Note: ${given.homeRefusal}`);
     data.docsError = {kind: 'install-failed', message: given.homeRefusal};
-    return applyComputerPlaces(places, data, record);
+    return applyComputerPlaces(places, given, data, record);
   }
   // What can stop the run comes before any place changes: the skill renders,
   // and the config can take the record, which is saved once a new place
@@ -435,7 +435,7 @@ async function applyPlaces(cwd, options, invocation, data, given) {
     }
   }
 
-  await applyComputerPlaces(places, data, record);
+  await applyComputerPlaces(places, given, data, record);
 
 }
 
@@ -474,12 +474,13 @@ function checkPlaces(given) {
 
 /**
  * Write the computer places `--to` named: folders outside any project,
- * saved in the settings file, and the computer-level skill.
+ * saved in the settings file unless `--once`, and the computer-level skill.
  * @param {import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace[]} places
+ * @param {InitPlaces} given
  * @param {import('../init.type.mjs').InitRunData} data
  * @param {(place: import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace, rows: ReturnType<typeof writeSkillPlace>) => void} record
  */
-async function applyComputerPlaces(places, data, record) {
+async function applyComputerPlaces(places, given, data, record) {
   const computerFolders = places.filter(
     place => place.scope === 'computer' && place.kind === 'folder',
   );

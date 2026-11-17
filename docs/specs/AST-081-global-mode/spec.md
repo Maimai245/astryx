@@ -531,8 +531,9 @@ works on is `spec:AST-040` FR9's.
     own: the global copy refreshes `<folder>/astryx/SKILL.md` on the same
     schedule while the file is there, an edited file kept, and never writes
     it again once it is deleted; `astryx init --to <folder>` writes it
-    again. Doctor's computer-level text check names these folders, which
-    are missing and which are from another release, also while the
+    again, and `astryx init --remove --to <folder>` removes it and forgets
+    the folder. Doctor's computer-level text check names these folders,
+    which are missing and which are from another release, also while the
     computer-level text is turned off.
   - The settings file is `astryx/settings.json` in the per-user configuration
     directory (FR7): `computerAgentText.install`, `true` or `false`, and
