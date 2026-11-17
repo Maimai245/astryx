@@ -264,7 +264,7 @@ extension Theme {
         border: Color(.sRGB, red: 0.9411764705882353, green: 0.9411764705882353, blue: 0.9764705882352941, opacity: 0.10196078431372549),
         borderBlue: Color(.sRGB, red: 0.17254901960784313, green: 0.23529411764705882, blue: 0.3215686274509804, opacity: 1),
         borderCyan: Color(.sRGB, red: 0.13725490196078433, green: 0.25098039215686274, blue: 0.2823529411764706, opacity: 1),
-        borderEmphasized: Color(.sRGB, red: 0.3686274509803922, green: 0.3686274509803922, blue: 0.39215686274509803, opacity: 1),
+        borderEmphasized: Color(.sRGB, red: 0.4666666666666667, green: 0.4666666666666667, blue: 0.48627450980392156, opacity: 1),
         borderError: Color(.sRGB, red: 0.9686274509803922, green: 0.8588235294117647, blue: 0.8431372549019608, opacity: 1),
         borderGray: Color(.sRGB, red: 0.22745098039215686, green: 0.22745098039215686, blue: 0.25882352941176473, opacity: 1),
         borderGreen: Color(.sRGB, red: 0.1843137254901961, green: 0.2549019607843137, blue: 0.17254901960784313, opacity: 1),
