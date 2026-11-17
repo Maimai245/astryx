@@ -12,7 +12,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {init} from './init.mjs';
+import {init, getNextSteps} from './init.mjs';
 import {AstryxError} from '../error.mjs';
 import {ERROR_CODES} from '../../foundation/response/error-codes.mjs';
 import {runCli} from '../../test-utils/run-cli.mjs';
@@ -108,6 +108,28 @@ async function refusal(fn) {
   expect(err).toBeInstanceOf(AstryxError);
   return /** @type {AstryxError} */ (err);
 }
+
+describe('init with no --to and nothing saved', () => {
+  it('writes and prints exactly what it did before --to existed', async () => {
+    const r = await runCli(['init'], project);
+    expect(r.status).toBe(0);
+    const lines = r.stdout.split('\n');
+    const tip = lines.find(line => line.includes('init --all'));
+    const invocation = /`(.+) init --all`/u.exec(tip ?? '')?.[1] ?? '';
+    expect(invocation).not.toBe('');
+    const version = /AGENTS\.md created \(Astryx (.+)\)/u.exec(r.stdout)?.[1];
+    expect(r.stdout).toBe(
+      [
+        `[ok] AI agent docs: AGENTS.md created (Astryx ${version})`,
+        '[ok] AI agent docs: GEMINI.md created',
+        '',
+        `  Tip: \`${invocation} init --all\` also points you to the theme and page-building workflows.`,
+        ...getNextSteps(invocation, project),
+      ].join('\n') + '\n',
+    );
+    expect(fs.readdirSync(project).sort()).toEqual(['.git', 'AGENTS.md', 'GEMINI.md', 'package.json']);
+  });
+});
 
 describe('init --to skills', () => {
   it('writes the block as a skill in both project skills folders and saves the place', async () => {
@@ -259,6 +281,22 @@ describe('computer places', () => {
     ).toBe(true);
     expect(settings().computerAgentText.install).toBe(true);
     expect(exists('AGENTS.md')).toBe(false);
+  });
+
+  it('--to user writes, prints, and reports exactly what --user does', async () => {
+    const viaUser = await runCli(['--json', 'init', '--user'], project);
+    const firstHome = home;
+    home = tmp('home2');
+    vi.stubEnv('HOME', home);
+    vi.stubEnv('USERPROFILE', home);
+    vi.stubEnv('XDG_CONFIG_HOME', path.join(home, '.config'));
+    vi.stubEnv('XDG_CACHE_HOME', path.join(home, '.cache'));
+    const viaTo = await runCli(['--json', 'init', '--to', 'user'], project);
+    expect(viaTo.status).toBe(viaUser.status);
+    expect(viaTo.stdout.replaceAll(home, '<home>')).toBe(viaUser.stdout.replaceAll(firstHome, '<home>'));
+    expect(
+      fs.readFileSync(path.join(home, '.agents', 'skills', 'astryx', 'SKILL.md'), 'utf8'),
+    ).toBe(fs.readFileSync(path.join(firstHome, '.agents', 'skills', 'astryx', 'SKILL.md'), 'utf8'));
   });
 
   it('a folder outside the project gets the computer-level skill, saved in the settings file', async () => {

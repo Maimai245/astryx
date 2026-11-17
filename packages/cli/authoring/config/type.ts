@@ -116,7 +116,7 @@ export interface AstryxConfig {
      * The places, one or a list: `'agents-md'` (the managed block in
      * AGENTS.md and the agent files beside it), `'skills'` (the project
      * skills folders, `.agents/skills/astryx` and `.claude/skills/astryx`),
-     * or a folder in the project written as a path (`'./team-skills'`), which
+     * or a folder in the project written as `'./<path>'` (`'./team-skills'`), which
      * gets `<folder>/astryx/SKILL.md`. Leaving it out means `'agents-md'`.
      */
     to?: string | string[];
