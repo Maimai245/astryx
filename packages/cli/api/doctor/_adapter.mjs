@@ -33,19 +33,40 @@ import {
   scanAutolinkCandidates,
 } from '../../foundation/integrations/autolink.mjs';
 import {
+  COMPUTER_COMMAND,
+  computerInstallStep,
   computerSkillFile,
   displayHomePath,
   inspectComputerAgentText,
+  renderComputerAgentText,
   skillCommandOf,
   skillInstallStepOf,
 } from '../../foundation/agent-docs/computer-agent-text.mjs';
-import {computerAgentTextSettings} from '../../foundation/env/user-settings.mjs';
+import {
+  computerAgentTextSettings,
+  computerSkillFolders,
+} from '../../foundation/env/user-settings.mjs';
+import {managedFileState} from '../../foundation/agent-docs/managed-skill-file.mjs';
+import * as os from 'node:os';
 import * as fs from 'node:fs';
 import {resolveAgentDocsRoot} from '../../foundation/agent-docs/agent-docs-target.mjs';
-import {placeSkillFiles, renderProjectSkill} from '../../foundation/agent-docs/skill-places.mjs';
-import {managedFileState} from '../../foundation/agent-docs/managed-skill-file.mjs';
+import {
+  AGENT_DOC_PATHS,
+  holdsAstryxBlock,
+} from '../../foundation/agent-docs/agent-doc-state.mjs';
 import {renderAgentDocsBlock} from '../../foundation/agent-docs/agent-docs.mjs';
-import {readProjectPlaces} from '../../foundation/agent-docs/skill-place-files.mjs';
+import {
+  COMPUTER_SKILL_NAME,
+  PROJECT_SKILL_FOLDERS,
+  PROJECT_SKILL_NAME,
+  placeSkillFiles,
+  renderProjectSkill,
+  savedName,
+} from '../../foundation/agent-docs/skill-places.mjs';
+import {
+  inspectSkillPlace,
+  readProjectPlaces,
+} from '../../foundation/agent-docs/skill-place-files.mjs';
 import {createRequire} from 'node:module';
 import {placeholderUses} from '../../foundation/discovery/template-icons.mjs';
 export {placeholderFixes} from '../../foundation/discovery/template-icons.mjs';
@@ -602,7 +623,7 @@ function declaredPackageNames(cwd) {
  * the skill file tells agents to run and the install step it records for when
  * that command is not found (each null when there is no file, or it names
  * none).
- * @returns {{settings: import('../../foundation/env/user-settings.mjs').ComputerAgentTextSettings, entries: Array<{path: string, state: import('../../foundation/agent-docs/computer-agent-text.mjs').ComputerAgentTextState, link?: true}>, command: string | null, install: string | null}}
+ * @returns {{settings: import('../../foundation/env/user-settings.mjs').ComputerAgentTextSettings, entries: Array<{path: string, state: import('../../foundation/agent-docs/computer-agent-text.mjs').ComputerAgentTextState, link?: true}>, command: string | null, install: string | null, folders: Array<{path: string, state: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileState}>}}
  */
 export function computerAgentTextState() {
   const settings = computerAgentTextSettings();
@@ -615,11 +636,23 @@ export function computerAgentTextState() {
   } catch {
     // No skill file, or one that cannot be read: no command to check.
   }
+  const text = renderComputerAgentText({
+    command: COMPUTER_COMMAND,
+    install: computerInstallStep({for: 'judge'}),
+  });
   return {
     settings,
     entries: inspectComputerAgentText({links: settings.links}),
     command,
     install,
+    // The folders outside any project `init --to <folder>` saved.
+    folders: computerSkillFolders().map(folder => {
+      const dir = folder.startsWith('~') ? path.join(os.homedir(), folder.slice(1)) : folder;
+      return {
+        path: folder,
+        state: managedFileState(path.join(dir, COMPUTER_SKILL_NAME, 'SKILL.md'), text),
+      };
+    }),
   };
 }
 
@@ -1016,4 +1049,78 @@ export async function savedProjectSkillFiles(cwd) {
   return places.flatMap(place =>
     placeSkillFiles(place, root).map(file => ({file, state: managedFileState(file, text)})),
   );
+}
+
+/**
+ * What doctor reads about the project's skill places.
+ * @typedef {object} SkillPlacesReport
+ * @property {string[]} places The saved places, as astryx.config saves them; `agents-md` when nothing is saved.
+ * @property {Array<{path: string, place: string, state: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileState}>} files
+ *   Each file of a saved `skills` or folder place against this release's project skill, relative to the folder doctor runs in.
+ * @property {string | null} renderError Why the project skill could not be rendered, when a skill place is saved and it could not.
+ * @property {string[]} blockFiles The project's agent files that hold the Astryx block.
+ * @property {string[]} skillFiles The project skill files present in the project skills folders, saved or not.
+ * @property {string[]} plainNamed Project skills folders named `astryx`, the computer-level skill's name.
+ * @property {boolean} computerSkill Whether the computer-level skill file is present.
+ */
+
+/**
+ * Read the project's skill places for doctor: the saved places and each of
+ * their files against this release's project skill, the agent files holding
+ * the block, the skill files present, and whether the computer-level skill is
+ * there.
+ * @param {string} cwd
+ * @returns {Promise<SkillPlacesReport>}
+ */
+export async function readSkillPlaces(cwd) {
+  const root = resolveAgentDocsRoot(cwd) ?? cwd;
+  /** @param {string} file */
+  const shown = file => path.relative(cwd, file).split(path.sep).join('/') || '.';
+  /** @param {string} file */
+  const read = file => {
+    try {
+      return fs.readFileSync(file, 'utf8');
+    } catch {
+      return null;
+    }
+  };
+  const places = await readProjectPlaces(root);
+  const skillPlaces = places.filter(place => place.kind === 'skills' || place.kind === 'folder');
+  /** @type {SkillPlacesReport['files']} */
+  const files = [];
+  let renderError = null;
+  if (skillPlaces.length > 0) {
+    try {
+      const text = renderProjectSkill(await renderAgentDocsBlock(root));
+      for (const place of skillPlaces) {
+        for (const {file, state} of inspectSkillPlace(place, root, text)) {
+          files.push({path: shown(file), place: savedName(place), state});
+        }
+      }
+    } catch (err) {
+      renderError = err instanceof Error ? err.message : String(err);
+    }
+  }
+  const blockFiles = AGENT_DOC_PATHS.map(rel => path.join(root, rel))
+    .filter(file => holdsAstryxBlock(read(file) ?? ''))
+    .map(shown);
+  const skillFiles = PROJECT_SKILL_FOLDERS.map(folder =>
+    path.join(root, folder, PROJECT_SKILL_NAME, 'SKILL.md'),
+  )
+    .filter(file => read(file) != null)
+    .map(shown);
+  const plainNamed = PROJECT_SKILL_FOLDERS.map(folder =>
+    path.join(root, folder, COMPUTER_SKILL_NAME),
+  )
+    .filter(dir => fs.existsSync(path.join(dir, 'SKILL.md')))
+    .map(shown);
+  return {
+    places: places.map(savedName),
+    files,
+    renderError,
+    blockFiles,
+    skillFiles,
+    plainNamed,
+    computerSkill: fs.existsSync(computerSkillFile()),
+  };
 }

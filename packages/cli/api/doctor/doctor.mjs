@@ -128,6 +128,7 @@ import {
   readThemeState,
   builtTargetOf,
   savedProjectSkillFiles,
+  readSkillPlaces,
 } from './_adapter.mjs';
 import {checkBuilt} from './built-checks.mjs';
 import {coreOnlyDocNames} from '../../foundation/bases/core-docs.mjs';
@@ -167,6 +168,8 @@ import {
  * @property {Array<{file: string, state: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileState}> | null} [projectSkillFiles]
  *   The project skill files and their states, when astryx.config `skills.to`
  *   saves no `agents-md` place; null otherwise.
+ * @property {import('./_adapter.mjs').SkillPlacesReport|null} [skillPlaces]
+ *   The project's skill places, or null when they could not be read.
  * @property {import('../../foundation/integrations/integrations.mjs').LoadedIntegration[]|null} [integrations]
  *   Every integration the project loaded, or null when the project could not be
  *   read at all.
@@ -987,6 +990,79 @@ export function checkAgentDocs(ctx) {
     label: 'AI agent docs',
     status: 'pass',
     message: `Astryx agent docs section present in ${withMarkers.map(shown).join(', ')}.`,
+  };
+}
+
+/**
+ * The project's skill places (astryx.config `skills.to`): each file of a
+ * saved `skills` or folder place against this release's project skill, a
+ * project that holds both the block and the skill (agents read Astryx twice),
+ * and a project skill named `astryx`, the computer-level skill's name, which
+ * an agent shows in place of one of the two. Left out of a project that keeps
+ * only the AGENTS.md block and has no project skill.
+ * @param {DoctorContext} ctx
+ * @returns {DoctorCheck | null}
+ */
+export function checkSkillPlaces(ctx) {
+  const report = ctx.skillPlaces;
+  if (!report) return null;
+  const blockOnly = report.places.length === 1 && report.places[0] === 'agents-md';
+  if (blockOnly && report.skillFiles.length === 0 && report.plainNamed.length === 0) {
+    return null;
+  }
+  const base = {id: 'skill-places', label: 'Astryx skill places'};
+  const init = (/** @type {string} */ args) => `\`${formatCliCommand(`astryx init ${args}`.trim(), ctx.cwd)}\``;
+  const saved = report.places.join(',');
+  if (report.renderError) {
+    return {
+      ...base,
+      status: 'warn',
+      message: `The Astryx skill could not be rendered, so its files were not checked: ${firstLine(report.renderError)}`,
+      fix: `Fix what the message names, then run ${init('')}.`,
+    };
+  }
+  if (report.plainNamed.length > 0) {
+    return {
+      ...base,
+      status: 'warn',
+      message: `${report.plainNamed.join(', ')} ${report.plainNamed.length === 1 ? 'is a project skill' : 'are project skills'} named \`astryx\`, the name of the computer-level skill, so an agent that has both shows only one, and Claude Code shows the computer one.`,
+      fix: `Delete ${report.plainNamed.length === 1 ? 'it' : 'them'}; ${init('--to skills')} writes the project skill as \`astryx-project\`.`,
+    };
+  }
+  const doubled = report.blockFiles.length > 0 && report.skillFiles.length > 0;
+  if (doubled) {
+    return {
+      ...base,
+      status: 'warn',
+      message: `The Astryx guidance is here twice: as the block in ${report.blockFiles.join(', ')} and as the skill in ${report.skillFiles.join(', ')}, so agents read it twice.`,
+      fix: `Keep one place: ${init(`--to ${saved}`)} moves the project to its saved places and removes the other.`,
+    };
+  }
+  const stale = report.files.filter(file => file.state === 'absent' || file.state === 'differs');
+  const kept = report.files.filter(file => file.state === 'edited' || file.state === 'foreign');
+  const keptNote =
+    kept.length > 0
+      ? ` Kept as they are (edited, or not written by Astryx): ${kept.map(file => file.path).join(', ')}.`
+      : '';
+  const codexNote = report.computerSkill && report.skillFiles.length > 0
+    ? ' This computer also has the computer-level `astryx` skill, so Codex lists both skills.'
+    : '';
+  if (stale.length > 0) {
+    return {
+      ...base,
+      status: 'warn',
+      message: `The Astryx skill is missing or out of date in ${stale.map(file => file.path).join(', ')}.${keptNote}${codexNote}`,
+      fix: `Run ${init('')} to write the saved places (\`astryx upgrade --apply\` also refreshes them).`,
+    };
+  }
+  const current = report.files.filter(file => file.state === 'current');
+  return {
+    ...base,
+    status: kept.length > 0 && current.length === 0 ? 'info' : 'pass',
+    message:
+      current.length > 0
+        ? `The Astryx skill matches this release in ${current.map(file => file.path).join(', ')}.${keptNote}${codexNote}`
+        : `Saved places: ${report.places.join(', ')}.${keptNote}${codexNote}`,
   };
 }
 
@@ -1963,6 +2039,8 @@ export function checkCliCommand(ctx) {
  *   the person's choices about the computer-level agent text
  * @property {string | null} [agentTextCommand] the command the skill file
  *   tells agents to run, or null
+ * @property {Array<{path: string, state: import('../../foundation/agent-docs/managed-skill-file.mjs').ManagedFileState}>} [agentTextFolders]
+ *   each folder outside a project that `init --to <folder>` saved
  * @property {string | null} [agentTextInstall] the install step the skill
  *   file records for when that command is not found, or null
  * @property {string} [cwd] the folder doctor runs in, for the printed fix
@@ -2240,7 +2318,23 @@ export function checkComputerAgentText(ctx) {
   const missing = links
     .filter(l => l.state === 'absent' || l.state === 'differs')
     .map(home);
+  const folders =
+    ctx.agentTextFolders ??
+    (state ? state.folders : []);
+  const staleFolders = folders.filter(f => f.state === 'absent' || f.state === 'differs');
+  const keptFolders = folders.filter(f => f.state === 'edited' || f.state === 'foreign');
+  const folderNote =
+    (folders.length > 0
+      ? ` Also in the folders \`init --to\` saved: ${folders.map(f => f.path).join(', ')}.`
+      : '') +
+    (staleFolders.length > 0
+      ? ` Missing or out of date there: ${staleFolders.map(f => f.path).join(', ')}; the CLI installed for the computer refreshes them after its next upgrade, and \`astryx init --to <folder>\` writes one now.`
+      : '') +
+    (keptFolders.length > 0
+      ? ` Kept as they are (edited, or not written by Astryx): ${keptFolders.map(f => f.path).join(', ')}.`
+      : '');
   const linkNote =
+    folderNote +
     (linked.length > 0 ? ` Linked into: ${linked.join(', ')}.` : '') +
     (copied.length > 0 ? ` Copied into: ${copied.join(', ')}.` : '') +
     (skipped.length > 0
@@ -2469,6 +2563,7 @@ export const SYNC_CHECKS = [
   checkIconSets,
   checkIconPlaceholders,
   checkAgentDocs,
+  checkSkillPlaces,
   checkPeerDeps,
   checkPackageManager,
   checkCliCommand,
@@ -2658,12 +2753,21 @@ export async function runChecks(options = {}) {
     }
   }
 
+  /** @type {DoctorContext['skillPlaces']} */
+  let skillPlaces = null;
+  try {
+    skillPlaces = await readSkillPlaces(cwd);
+  } catch {
+    // Unreadable places leave the skill-places check out.
+  }
+
   /** @type {DoctorContext} */
   const ctx = {
     cwd,
     nodeVersion: process.versions.node,
     coreDir,
     projectSkillFiles: await savedProjectSkillFiles(cwd),
+    skillPlaces,
     ownCli: projectHasOwnCli(cwd),
     projectCore: projectCoreVersion(cwd),
     addedThemePackages: addedThemePackages(cwd),

@@ -48,6 +48,19 @@
  * @property {string[]} files Files rewritten (apply) or that would be rewritten (dry-run), relative to the folder the command ran in.
  * @property {boolean} refreshed True only when a block was actually rewritten (apply mode).
  * @property {'refreshed' | 'would-refresh' | 'nudge-init' | 'error' | 'none'} action
+ * @property {UpgradeSkillFile[]} skills One row per file of the project's saved skill places (astryx.config `skills.to`: `skills` or a folder); empty when the project saves only the AGENTS.md block. When the project saves no `agents-md` place, the block is not checked, and `status` and `action` describe the skill files alone.
+ */
+
+/**
+ * What upgrade found, or did, for one file of a saved skill place.
+ * `current`: it holds this release's text. `would-create` and `would-update`
+ * (a dry run), `created` and `updated` (`--apply`): it was missing, or held
+ * another release's text. `kept`: left as it is (see `reason`).
+ * @typedef {object} UpgradeSkillFile
+ * @property {string} path The file, relative to the folder the command ran in.
+ * @property {string} place The place, as astryx.config saves it: `skills` or `./<folder>`.
+ * @property {'current' | 'would-create' | 'would-update' | 'created' | 'updated' | 'kept'} action
+ * @property {'edited' | 'not-astryx'} [reason] Only on `kept`: a person edited it since Astryx wrote it, or Astryx did not write it.
  */
 
 /**

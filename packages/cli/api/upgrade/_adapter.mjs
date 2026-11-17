@@ -64,6 +64,12 @@ import {
 } from '../../foundation/bases/resolve.mjs';
 
 import {CORE_PROVIDER_ID} from '../../foundation/identity/providers.mjs';
+import {renderProjectSkill, savedName} from '../../foundation/agent-docs/skill-places.mjs';
+import {
+  inspectSkillPlace,
+  readProjectPlaces,
+} from '../../foundation/agent-docs/skill-place-files.mjs';
+import {writeManagedFile} from '../../foundation/agent-docs/managed-skill-file.mjs';
 
 /** The package that owns Core's components, hooks, and codemods. */
 export {CORE_PROVIDER_ID as CORE_PACKAGE} from '../../foundation/identity/providers.mjs';
@@ -478,6 +484,10 @@ export async function runPostCodemodHooks(hooks, context) {
  *   runs at a project root above it
  * @property {string|null} renderedBlock
  * @property {import('./upgrade.type.mjs').AgentDocsSummary} summary
+ * @property {string} [blockAction] what the AGENTS.md block alone needs,
+ *   before the skill places add to `summary.action`
+ * @property {{text: string, writes: Array<{file: string, row: import('./upgrade.type.mjs').UpgradeSkillFile}>} | null} [skills]
+ *   the project skill and the files of the saved skill places it would write
  */
 
 /**
@@ -524,6 +534,103 @@ export async function prepareAgentDocsRefresh({
   fresh = false,
   origin,
 }) {
+  const places = await readProjectPlaces(cwd);
+  const skillPlaces = places.filter(
+    place => place.kind === 'skills' || place.kind === 'folder',
+  );
+  const plan = places.some(place => place.kind === 'agents-md')
+    ? await prepareBlockRefresh({cwd, installedVersion, apply, fresh, origin})
+    : {
+        cwd,
+        origin,
+        renderedBlock: null,
+        summary: /** @type {import('./upgrade.type.mjs').AgentDocsSummary} */ ({
+          status: 'current',
+          installedVersion,
+          fromVersions: [],
+          files: [],
+          refreshed: false,
+          action: 'none',
+          skills: [],
+        }),
+      };
+  plan.blockAction = plan.summary.action;
+  plan.summary.skills = [];
+  if (skillPlaces.length > 0) {
+    await prepareSkillRefresh(plan, skillPlaces, {installedVersion, apply, fresh});
+  }
+  return plan;
+}
+
+/**
+ * Plan the refresh of the saved skill places: each file this release's
+ * project skill would create or update, and each it keeps (edited, or not
+ * Astryx's). A file is written only by `--apply`.
+ * @param {AgentDocsRefreshPlan} plan
+ * @param {import('../../foundation/agent-docs/skill-places.mjs').SkillPlace[]} skillPlaces
+ * @param {{installedVersion: string, apply: boolean, fresh: boolean}} options
+ */
+async function prepareSkillRefresh(plan, skillPlaces, {installedVersion, apply, fresh}) {
+  const {cwd, origin, summary} = plan;
+  let block = plan.renderedBlock;
+  try {
+    block ??= await renderAgentDocsBlock(cwd, {installedVersion, fresh});
+  } catch {
+    summary.action = 'error';
+    logger.warn(
+      `Could not render the Astryx skill. Run ${initAdvice(cwd, origin)} to update it manually.`,
+    );
+    return;
+  }
+  const text = renderProjectSkill(block);
+  const shownFrom = origin ?? cwd;
+  /** @type {Array<{file: string, row: import('./upgrade.type.mjs').UpgradeSkillFile}>} */
+  const writes = [];
+  for (const place of skillPlaces) {
+    for (const {file, state} of inspectSkillPlace(place, cwd, text)) {
+      /** @type {import('./upgrade.type.mjs').UpgradeSkillFile} */
+      const row = {
+        path: path.relative(shownFrom, file).split(path.sep).join('/'),
+        place: savedName(place),
+        action:
+          state === 'current'
+            ? 'current'
+            : state === 'absent'
+              ? 'would-create'
+              : state === 'differs'
+                ? 'would-update'
+                : 'kept',
+      };
+      if (row.action === 'kept') row.reason = state === 'edited' ? 'edited' : 'not-astryx';
+      summary.skills?.push(row);
+      if (row.action === 'would-create' || row.action === 'would-update') {
+        writes.push({file, row});
+      }
+    }
+  }
+  plan.skills = {text, writes};
+  if (writes.length === 0) return;
+  if (summary.status === 'current') summary.status = 'stale';
+  if (summary.action === 'none') summary.action = 'would-refresh';
+  if (!apply) {
+    logger.warn(
+      `The Astryx skill differs from the installed Astryx and integration configuration. Re-run with --apply to refresh (${writes.map(each => each.row.path).join(', ')}).`,
+    );
+  }
+}
+
+/**
+ * Plan the refresh of the AGENTS.md block, the default place.
+ * @param {{cwd: string, installedVersion: string, apply: boolean, fresh?: boolean, origin?: string}} ctx
+ * @returns {Promise<AgentDocsRefreshPlan>}
+ */
+async function prepareBlockRefresh({
+  cwd,
+  installedVersion,
+  apply,
+  fresh = false,
+  origin,
+}) {
   const initial = inspectAgentDocs(cwd, installedVersion);
   /** @type {import('./upgrade.type.mjs').AgentDocsSummary} */
   const summary = {
@@ -533,6 +640,7 @@ export async function prepareAgentDocsRefresh({
     files: [],
     refreshed: false,
     action: 'none',
+    skills: [],
   };
 
   if (initial.status === 'missing') {
@@ -603,8 +711,45 @@ export async function prepareAgentDocsRefresh({
  * @returns {import('./upgrade.type.mjs').AgentDocsSummary}
  */
 export function applyAgentDocsRefresh(plan) {
+  const summary = applyBlockRefresh(plan);
+  applySkillRefresh(plan);
+  return summary;
+}
+
+/**
+ * Write the files of the saved skill places the plan names. A file a person
+ * edited since the plan was made is kept.
+ * @param {AgentDocsRefreshPlan} plan
+ */
+function applySkillRefresh(plan) {
+  const {summary, skills} = plan;
+  if (!skills || skills.writes.length === 0) return;
+  for (const {file, row} of skills.writes) {
+    const result = writeManagedFile(file, skills.text);
+    if (result.action === 'kept') {
+      row.action = 'kept';
+      row.reason = result.reason;
+      continue;
+    }
+    row.action = result.action === 'created' ? 'created' : result.action === 'updated' ? 'updated' : 'current';
+    if (row.action !== 'current') {
+      summary.refreshed = true;
+      logger.log(`[ok] Astryx skill refreshed -> ${row.path}`);
+    }
+  }
+  if (summary.refreshed && (summary.action === 'would-refresh' || summary.action === 'none')) {
+    summary.action = 'refreshed';
+  }
+}
+
+/**
+ * Commit a prepared refresh of the AGENTS.md block.
+ * @param {AgentDocsRefreshPlan} plan
+ * @returns {import('./upgrade.type.mjs').AgentDocsSummary}
+ */
+function applyBlockRefresh(plan) {
   const {cwd, origin, renderedBlock, summary} = plan;
-  if (summary.action !== 'would-refresh' || renderedBlock == null)
+  if ((plan.blockAction ?? summary.action) !== 'would-refresh' || renderedBlock == null)
     return summary;
 
   try {
