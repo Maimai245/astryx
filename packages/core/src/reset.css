@@ -94,9 +94,16 @@
   /*
    * Remove default body margin and set font smoothing for sharper text
    * rendering on macOS/iOS.
+   *
+   * body takes the --text-body-size token, so text that only inherits its
+   * size (plain text in a card, a quote) draws at the theme's body size, as
+   * Core's own body text does. It is set on body, not html, so rem keeps the
+   * browser's size. Where no stylesheet defines the token, body keeps the
+   * browser's size. An app's own body font-size wins.
    */
   :where(body) {
     margin: 0;
+    font-size: var(--text-body-size);
     line-height: inherit;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

@@ -217,4 +217,17 @@ describe('reset.css pseudo-element rules', () => {
     expect(fontFamilyOf(':where(html)')).toBe('var(--font-family-body)');
     expect(fontFamilyOf(':where(body)')).toBeUndefined();
   });
+
+  it('gives body, not html, the --text-body-size token', () => {
+    // Text that only inherits its size draws at the theme's body size. On
+    // body, not html, so rem keeps the browser's size; with no token defined
+    // the declaration has no value and body keeps the browser's size.
+    const fontSizeOf = (selector: string) =>
+      ruleBlocks
+        .filter(block => block.selector === selector)
+        .map(({body}) => body.match(/font-size:\s*([^;]+);/)?.[1])
+        .find(Boolean);
+    expect(fontSizeOf(':where(body)')).toBe('var(--text-body-size)');
+    expect(fontSizeOf(':where(html)')).toBeUndefined();
+  });
 });
