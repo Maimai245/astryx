@@ -137,9 +137,10 @@ export const OVERRIDES = [
   [/\b((table )?cells?)\b/, {on: 'table-cell'}],
   [/\b(table rows?|rows?|tables?)\b/, {on: 'table-row'}],
   // (The space between a shortcut's keys is the gap of Kbd, which lays the
-  // keys out.)
+  // keys out: "the gap in the keyboard shortcut", "the keyboard shortcut's
+  // gap", "space between the keys in the kbd".)
   [
-    /\b(?:gaps?|space|spacing|room)\s+(?:between|in)\s+(?:the\s+)?(?:keyboard (?:keys?|shortcuts?|chips?)|kbds?|key ?(?:chips?|caps?)|shortcut keys?)\b/,
+    /\b(?:(?:gaps?|space|spacing|room)\s+(?:between|in|of)\s+(?:the\s+)?(?:keyboard (?:keys?|shortcuts?|chips?)|kbds?|key ?(?:chips?|caps?)|shortcut keys?)|(?:gaps?|space|spacing|room)\s+between\s+(?:the\s+)?keys?\s+(?:in|of)\s+(?:the\s+)?(?:keyboard (?:keys?|shortcuts?|chips?)|kbds?|key ?(?:chips?|caps?)|shortcut keys?)|(?:keyboard (?:keys?|shortcuts?|chips?)|kbds?|key ?(?:chips?|caps?)|shortcut keys?)(?:'s)?\s+gaps?)\b/,
     {on: 'kbd'},
   ],
   // (A keyboard key or shortcut, "the key chips", "the kbd", is painted by

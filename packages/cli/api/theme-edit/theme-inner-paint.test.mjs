@@ -108,6 +108,11 @@ describe('a paint drawn inside a part', () => {
     for (const q of [
       'make the gap in the keyboard shortcut bigger',
       'put more space between the keyboard keys',
+      'Make the keyboard shortcut gap bigger',
+      "make the keyboard shortcut's gap bigger",
+      'make the gap of the keyboard shortcut bigger',
+      'more space between the keys in the keyboard shortcut',
+      'make the kbd gap 8px',
     ]) {
       const gap = await answer(q, 'i');
       expect(gap.writes[0], q).toMatch(/ --on kbd$/);
