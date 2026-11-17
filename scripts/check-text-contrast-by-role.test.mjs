@@ -14,6 +14,7 @@
  *   nested default card, a transparent card, a text field, inline code, an
  *   open menu, a selected segment, an input group addon, a step number, a
  *   banner and a striped table row (whose cell color the table root fixes);
+ * - a pressed nav item's text on the pressed fill over the page;
  * - every input's frame against its field, the page and a card (3:1, as a
  *   control's boundary);
  * - secondary text on a selected row, a dropzone and a numbered citation on
@@ -372,8 +373,16 @@ function rows() {
           ...rule(theme, part, key),
         });
         const layers = [at(tokens, '--color-accent-muted'), body];
-        for (const role of ['--color-text-primary', '--color-text-secondary'])
+        for (const role of TEXT_ROLES)
           push({...base, where, role, text: at(tokens, role), layers});
+      }
+      // A pressed nav item draws its own rule's text on that fill.
+      {
+        const nav = themeTokens(theme, rule(theme, 'top-nav-item'));
+        roles('pressed nav item', nav, [
+          at(page, '--color-overlay-pressed'),
+          body,
+        ]);
       }
       // An input's frame against the field inside it and the page or card
       // around it: a control's boundary, held to 3:1 (non-text).
