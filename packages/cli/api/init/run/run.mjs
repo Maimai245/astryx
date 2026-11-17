@@ -375,12 +375,27 @@ async function applyPlaces(cwd, options, invocation, data, given) {
   if (projectPlaces.some(place => place.kind === 'agents-md')) {
     await applyAgents(cwd, options, invocation, data);
   }
+  // Whether the guidance landed in a skill place: a place whose files are
+  // all a person's own is kept as it is, so it holds no Astryx text.
+  let landed = false;
   if (text != null && projectRoot) {
-    for (const place of skillPlaces) record(place, writeSkillPlace(place, projectRoot, text));
+    for (const place of skillPlaces) {
+      const rows = writeSkillPlace(place, projectRoot, text);
+      if (rows.some(row => row.action !== 'kept')) landed = true;
+      record(place, rows);
+    }
   }
+  const blockStays = projectPlaces.some(place => place.kind === 'agents-md');
   for (const place of leaving) {
     if (place.kind !== 'agents-md') {
       record(place, removeSkillPlace(place, /** @type {string} */ (projectRoot)));
+      continue;
+    }
+    // The block is the only Astryx text left when every new place was kept.
+    if (!blockStays && !landed) {
+      logger.warn(
+        'Note: The Astryx block stays in the agent files: every new place holds a file Astryx did not write or one you edited, so nothing else holds the guidance yet.',
+      );
       continue;
     }
     const root = /** @type {string} */ (projectRoot);

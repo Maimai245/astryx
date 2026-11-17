@@ -21,8 +21,6 @@
  */
 
 import {fileURLToPath} from 'node:url';
-import * as os from 'node:os';
-import * as path from 'node:path';
 import {
   COMPUTER_COMMAND,
   computerInstallStep,
@@ -30,7 +28,7 @@ import {
   writeComputerAgentText,
 } from '../agent-docs/computer-agent-text.mjs';
 import {writeManagedFile} from '../agent-docs/managed-skill-file.mjs';
-import {COMPUTER_SKILL_NAME} from '../agent-docs/skill-places.mjs';
+import {savedComputerFolderSkillFile} from '../agent-docs/skill-places.mjs';
 import {
   computerAgentTextSettings,
   computerSkillFolders,
@@ -52,18 +50,17 @@ if (stateDir) {
       });
     }
     // The folders `astryx init --to <folder>` saved outside any project get
-    // the same text, under the same rules: an edited file is kept.
+    // the same text, under the same rules: an edited file is kept. Each is
+    // its own choice, so turning the computer-level text off leaves them
+    // (spec AST-081 FR8); `init --remove --to <folder>` forgets one.
     if (folders.length > 0) {
       const text = renderComputerAgentText({
         command: COMPUTER_COMMAND,
         install: computerInstallStep(),
       });
       for (const folder of folders) {
-        const dir = folder.startsWith('~')
-          ? path.join(os.homedir(), folder.slice(1))
-          : folder;
         try {
-          writeManagedFile(path.join(dir, COMPUTER_SKILL_NAME, 'SKILL.md'), text);
+          writeManagedFile(savedComputerFolderSkillFile(folder), text);
         } catch {
           // A folder that cannot be written now is tried on the next release.
         }

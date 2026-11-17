@@ -195,6 +195,16 @@ describe('init --to skills', () => {
     expect(exists(CLAUDE)).toBe(false);
   });
 
+  it('keeps the block when every new place is a person\'s own', async () => {
+    await run({});
+    fs.mkdirSync(path.dirname(path.join(project, SHARED)), {recursive: true});
+    fs.writeFileSync(path.join(project, SHARED), '# mine\n');
+    const data = await run({to: 'skills'});
+    expect(data.skills.map(row => row.action)).toEqual(['kept', 'kept']);
+    expect(exists('AGENTS.md')).toBe(true);
+    expect(data.docsChanges.filter(c => c.change === 'removed')).toEqual([]);
+  });
+
   it('keeps a skill file a person edited, and one Astryx did not write', async () => {
     await run({to: 'skills'});
     fs.appendFileSync(path.join(project, SHARED), 'my note\n');

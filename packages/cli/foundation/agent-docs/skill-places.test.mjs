@@ -98,3 +98,11 @@ describe('renderProjectSkill', () => {
     expect(() => renderProjectSkill('body')).toThrow('managed block');
   });
 });
+
+describe('savedComputerFolderSkillFile', () => {
+  it('reads ~/ from the home folder and keeps an absolute folder', async () => {
+    const {savedComputerFolderSkillFile} = await import('./skill-places.mjs');
+    expect(savedComputerFolderSkillFile('~/team', home)).toBe(path.join(home, 'team', 'astryx', 'SKILL.md'));
+    expect(savedComputerFolderSkillFile(path.join(root, 'x'), home)).toBe(path.join(root, 'x', 'astryx', 'SKILL.md'));
+  });
+});

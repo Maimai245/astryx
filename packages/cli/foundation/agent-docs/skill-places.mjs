@@ -138,6 +138,17 @@ function homePath(dir, home) {
 }
 
 /**
+ * The computer-level skill file of a folder saved outside any project, from
+ * the text it is saved as (`~/<path>` or absolute).
+ * @param {string} saved
+ * @param {string} [home]
+ * @returns {string}
+ */
+export function savedComputerFolderSkillFile(saved, home = os.homedir()) {
+  return path.join(absoluteFolder(saved, home, home), COMPUTER_SKILL_NAME, 'SKILL.md');
+}
+
+/**
  * Whether `dir` is `root` or inside it.
  * @param {string} dir
  * @param {string} root
