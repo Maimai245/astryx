@@ -144,3 +144,18 @@ export function inspectSkillPlace(place, projectRoot, text) {
     state: managedFileState(file, text),
   }));
 }
+
+/**
+ * What a receipt line says about a skill file a run kept as it is, by why
+ * it was kept. `editedHint` says what a person does with a file they edited.
+ * @param {'edited' | 'not-astryx' | 'pair-kept' | undefined} reason
+ * @param {string} editedHint
+ * @returns {string}
+ */
+export function keptText(reason, editedHint) {
+  if (reason === 'edited') return `kept, edited since Astryx wrote it; ${editedHint}`;
+  if (reason === 'pair-kept') {
+    return "kept: the other copy of this place is not Astryx's, so neither copy is written";
+  }
+  return 'kept, not created by Astryx';
+}

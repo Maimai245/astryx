@@ -68,6 +68,7 @@ import {renderProjectSkill, savedName} from '../../foundation/agent-docs/skill-p
 import {
   inspectSkillPlace,
   readProjectPlaces,
+  keptText,
   skillPlaceEscape,
   writeSkillPlace,
 } from '../../foundation/agent-docs/skill-place-files.mjs';
@@ -638,6 +639,12 @@ async function prepareSkillRefresh(plan, skillPlaces, {installedVersion, apply, 
     }
     if ([...rows.values()].some(row => row.action.startsWith('would-'))) {
       writes.push({place, rows});
+    }
+  }
+  // A kept file stays on its old text: say so, as init does.
+  for (const row of summary.skills ?? []) {
+    if (row.action === 'kept') {
+      logger.log(`[skip] Astryx skill: ${row.path} ${keptText(row.reason, 'delete it, then run init, to get the current text')}`);
     }
   }
   if (plan.noBlock && total > 0) {

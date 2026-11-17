@@ -10,7 +10,7 @@
  * is not told to add the block.
  */
 
-import {afterEach, beforeEach, describe, expect, it} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -34,6 +34,7 @@ beforeEach(() => {
   fs.writeFileSync(path.join(core, 'package.json'), JSON.stringify({name: '@astryxdesign/core', version: '0.0.15'}));
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   fs.rmSync(dir, {recursive: true, force: true});
   logger.setSilent(true);
 });
@@ -90,8 +91,12 @@ describe('upgrade and the skills place', () => {
     expect(res.data.agentDocs.skills.map(row => row.action)).toEqual(['current', 'current']);
   });
 
-  it('keeps an edited file, and the other copy with it, so the copies never part', async () => {
+  it('keeps an edited file, and the other copy with it, so the copies never part, and says so', async () => {
     save('skills');
+    /** @type {string[]} */
+    const lines = [];
+    logger.setSilent(false);
+    vi.spyOn(logger, 'log').mockImplementation(line => void lines.push(String(line)));
     write(SHARED, `${olderSkill()}my note\n`);
     write(CLAUDE, olderSkill());
     const res = await upgrade({from: '0.0.15', apply: true}, {cwd: dir});
@@ -101,6 +106,8 @@ describe('upgrade and the skills place', () => {
     ]);
     expect(read(SHARED)).toMatch(/my note\n$/u);
     expect(read(CLAUDE)).toBe(olderSkill());
+    expect(lines.join('\n')).toContain(`[skip] Astryx skill: ${SHARED} kept, edited since Astryx wrote it`);
+    expect(lines.join('\n')).toContain(`[skip] Astryx skill: ${CLAUDE} kept: the other copy`);
   });
 
   it('writes nothing through a skills folder linked out of the project', async () => {
