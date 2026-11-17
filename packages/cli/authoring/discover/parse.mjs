@@ -122,7 +122,8 @@ function withoutIconSetFields(value) {
  * put newest first whatever order the source used.
  *
  * The experimental `icon-set` kind and its item fields (`iconCount`,
- * `license`, `definitions`) are read only with `iconSets` (spec:AST-084). Without it they
+ * `license`, `definitions`) are read only with `iconSets` (spec:AST-084),
+ * and those fields only on an `icon-set` item. Without it they
  * are unknown: the fields are taken off before the check and the items are
  * dropped after it, exactly as for any kind or field this CLI does not know
  * (spec:AST-051 FR7).
@@ -165,9 +166,24 @@ export function parseDiscoverCatalog(
     packages: parsed.data.packages.map(pkg => ({
       ...pkg,
       versions: [...pkg.versions].sort(newestFirst),
-      contributions: pkg.contributions.filter(c => known.includes(c.kind)),
+      contributions: pkg.contributions
+        .filter(c => known.includes(c.kind))
+        .map(c => (c.kind === 'icon-set' ? c : withoutFields(c))),
     })),
   });
+}
+
+/**
+ * An item that is not an icon set, without the icon-set-only fields: they
+ * belong to the `icon-set` kind alone.
+ * @template {object} T
+ * @param {T} item
+ * @returns {T}
+ */
+function withoutFields(item) {
+  const copy = /** @type {Record<string, unknown>} */ ({...item});
+  for (const field of ICON_SET_FIELDS) delete copy[field];
+  return /** @type {T} */ (copy);
 }
 
 /**

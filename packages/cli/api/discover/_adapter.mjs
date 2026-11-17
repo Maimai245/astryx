@@ -39,7 +39,7 @@ import {
   projectTree,
 } from '../docs/_adapter.mjs';
 import {discoverIntegrationIconSets} from '../../foundation/discovery/icon-set-discovery.mjs';
-import {astryxDefinitionsByName} from '../../foundation/discovery/icon-definition-discovery.mjs';
+import {astryxDefinitionCoverage} from '../../foundation/discovery/icon-definition-discovery.mjs';
 import {isValidSemver, semverCompare} from '../../foundation/env/semver.mjs';
 import {assertWithin} from '../../foundation/fs/path-safety.mjs';
 import {userCacheDir} from '../../foundation/env/user-dirs.mjs';
@@ -1216,10 +1216,12 @@ export async function loadValidatedDoc(result, {lang, zh}) {
 }
 
 /**
- * The names of the icon definitions this CLI ships: the meanings an icon set
- * can map.
- * @returns {Set<string>}
+ * How many of the icon definitions this CLI ships a set's definitions cover,
+ * of how many: the coverage `experimental icon --list` reports as
+ * `coverage.astryx`.
+ * @param {string[]} definitions
+ * @returns {{mapped: number, total: number}}
  */
-export function iconMeaningNames() {
-  return new Set(astryxDefinitionsByName().keys());
+export function iconSetCoverage(definitions) {
+  return astryxDefinitionCoverage(definitions);
 }

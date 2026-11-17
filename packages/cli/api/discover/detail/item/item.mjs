@@ -27,14 +27,15 @@ import {defaultVersion} from '../../_catalog-view.mjs';
  *   add?: (name: string, version?: string) => string,
  *   installedAs?: string,
  *   iconSets?: boolean,
- *   meaningNames?: () => Set<string>,
- * }} [options] `iconSets`: the project opts into icon sets, so a set's
- *   `definitions` are shown. `meaningNames` gives the icon definitions this
- *   CLI ships, which a set's coverage (iconSetMeanings) counts.
+ *   coverageOf?: (definitions: string[]) => {mapped: number, total: number},
+ * }} [options] `iconSets`: the project opts into icon sets, so an installed
+ *   package's set answers and a set's `definitions` are shown. `coverageOf`
+ *   counts how many of this CLI's icon definitions a set maps
+ *   (iconSetCoverageOf).
  * @returns {import('../../discover.type.mjs').DiscoverItemResponse | null}
  */
 export function item(packages, packageName, itemName, options = {}) {
-  const {catalog, version, add, installedAs, iconSets, meaningNames} = options;
+  const {catalog, version, add, installedAs, iconSets, coverageOf} = options;
   const pkg = packages.find(p => p.name === packageName);
   if (pkg && (!version || version === pkg.version)) {
     for (const [kind, field] of KIND_FIELDS) {
@@ -61,6 +62,7 @@ export function item(packages, packageName, itemName, options = {}) {
               ...(set.default ? {default: set.default} : {}),
               definitions: set.definitions,
               command: `astryx experimental icon <words> --set ${packageName}/${itemName}`,
+              experimental: true,
               installed: true,
             },
           };
@@ -90,6 +92,11 @@ export function item(packages, packageName, itemName, options = {}) {
     catalog?.contributions.find(c => c.name === itemName) ??
     catalog?.contributions.find(c => c.name.toLowerCase() === lower);
   if (!catalog || !found) return null;
+  // An installed package's icon set answers only in a project that opts in
+  // (spec:AST-084 FR17).
+  if (found.kind === 'icon-set' && (pkg != null || installedAs) && !iconSets) {
+    return null;
+  }
   const shown = version ?? defaultVersion(catalog);
   /** @type {import('../../discover.type.mjs').DiscoverItemResponse} */
   const response = {
@@ -113,6 +120,7 @@ export function item(packages, packageName, itemName, options = {}) {
             command: `astryx experimental icon <words> --set ${packageName}/${found.name}`,
           }
         : {}),
+      ...(found.kind === 'icon-set' ? {experimental: true} : {}),
       installed: pkg != null,
       ...(pkg == null && installedAs ? {installedAs} : {}),
       ...(pkg == null && !installedAs && add
@@ -121,11 +129,8 @@ export function item(packages, packageName, itemName, options = {}) {
       source: catalog.source,
     },
   };
-  if (found.definitions && meaningNames) {
-    meaningsOf.set(
-      response,
-      meaningsCovered(found.definitions, meaningNames()),
-    );
+  if (found.definitions && coverageOf) {
+    meaningsOf.set(response, coverageOf(found.definitions));
   }
   return response;
 }
@@ -143,19 +148,6 @@ const meaningsOf = new WeakMap();
  * @param {object} response
  * @returns {{mapped: number, total: number} | null}
  */
-export function iconSetMeanings(response) {
+export function iconSetCoverageOf(response) {
   return meaningsOf.get(response) ?? null;
-}
-
-/**
- * How many of this CLI's icon definitions a set maps, of how many there are.
- * @param {string[]} definitions the definitions the set's map covers
- * @param {Set<string>} names the definitions this CLI ships
- * @returns {{mapped: number, total: number}}
- */
-function meaningsCovered(definitions, names) {
-  return {
-    mapped: new Set(definitions.filter(name => names.has(name))).size,
-    total: names.size,
-  };
 }

@@ -6,7 +6,7 @@
  */
 
 import {describe, expect, it} from 'vitest';
-import {iconSetMeanings, item} from './item.mjs';
+import {iconSetCoverageOf, item} from './item.mjs';
 
 /** @type {any[]} */
 const PACKAGES = [
@@ -100,13 +100,18 @@ describe('discover.item leaf, an icon set a source lists', () => {
       },
     ],
   };
-  const meaningNames = () => new Set(['close', 'search', 'menu', 'home']);
+  const names = new Set(['close', 'search', 'menu', 'home']);
+  /** @param {string[]} definitions */
+  const coverageOf = definitions => ({
+    mapped: definitions.filter(name => names.has(name)).length,
+    total: names.size,
+  });
 
   it('shows its descriptor text and, beside the JSON, how many of the CLI meanings it maps, never its definitions without the opt-in', () => {
     const res = item(PACKAGES, '@acme/glyph-pack', 'glyphs', {
       catalog: PACK,
       add,
-      meaningNames,
+      coverageOf,
     });
     expect(res?.data).toEqual({
       package: '@acme/glyph-pack',
@@ -117,11 +122,12 @@ describe('discover.item leaf, an icon set a source lists', () => {
       summary: 'Outline icons.',
       license: 'MIT',
       iconCount: 412,
+      experimental: true,
       installed: false,
       install: 'pnpm add @acme/glyph-pack',
       source: 'Acme',
     });
-    expect(iconSetMeanings(/** @type {object} */ (res))).toEqual({
+    expect(iconSetCoverageOf(/** @type {object} */ (res))).toEqual({
       mapped: 2,
       total: 4,
     });
@@ -132,7 +138,7 @@ describe('discover.item leaf, an icon set a source lists', () => {
       item(PACKAGES, '@acme/glyph-pack', 'glyphs', {
         catalog: PACK,
         add,
-        meaningNames,
+        coverageOf,
         iconSets: true,
       })?.data.definitions,
     ).toEqual(['close', 'search', 'not-a-cli-meaning']);
@@ -143,9 +149,29 @@ describe('discover.item leaf, an icon set a source lists', () => {
     const res = item(PACKAGES, '@acme/glyph-pack', 'glyphs', {
       catalog: {...PACK, contributions: [set]},
       add,
-      meaningNames,
+      coverageOf,
     });
-    expect(iconSetMeanings(/** @type {object} */ (res))).toBeNull();
+    expect(iconSetCoverageOf(/** @type {object} */ (res))).toBeNull();
     expect(res?.data).not.toHaveProperty('definitions');
+  });
+});
+
+describe('discover.item leaf, an icon set of an installed package', () => {
+  it('answers from the catalog only in a project that opts in', () => {
+    /** @type {any} */
+    const catalog = {
+      package: '@acme/widgets',
+      integration: '@acme/widgets',
+      aliases: [],
+      latest: '1.2.3',
+      source: 'Acme',
+      versions: [],
+      contributions: [{kind: 'icon-set', name: 'glyphs', iconCount: 3}],
+    };
+    expect(item(PACKAGES, '@acme/widgets', 'glyphs', {catalog})).toBeNull();
+    expect(
+      item(PACKAGES, '@acme/widgets', 'glyphs', {catalog, iconSets: true})?.data
+        .installed,
+    ).toBe(true);
   });
 });

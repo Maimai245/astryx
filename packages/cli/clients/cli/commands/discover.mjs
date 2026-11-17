@@ -27,10 +27,11 @@ import {
   code,
 } from '../formatters/index.mjs';
 import {cliError, rejectEmptyArgument} from '../lib/cli-error.mjs';
+import {definitionCoverageText} from '../../../foundation/text/definition-coverage.mjs';
 import {
   answersQueries,
   discover as discoverApi,
-  iconSetMeanings,
+  iconSetCoverageOf,
   OFFICIAL_SOURCE_NAME,
 } from '../../../api/discover/discover.mjs';
 import {isValidSemver} from '../../../foundation/env/semver.mjs';
@@ -171,26 +172,31 @@ function withDocSections(entry, run) {
 }
 
 /**
- * An icon set's item page as the text view shows it: after its icon count,
- * how many of the CLI's icon definitions it maps, of how many. The JSON
- * carries no such field.
+ * An icon set's item page as the text view shows it: how many of the CLI's
+ * icon definitions it maps, of how many, as `definitions`, the label
+ * `experimental icon --list` prints it under. With the opt-in that line
+ * stands for the definitions themselves, which `--json` lists. The JSON
+ * carries no count.
  * @template {object} T
  * @param {T} data
- * @param {{mapped: number, total: number} | null} meanings
+ * @param {{mapped: number, total: number} | null} coverage
  * @returns {T | Record<string, unknown>}
  */
-function withIconSetMeanings(data, meanings) {
-  if (!meanings) return data;
+function withIconSetCoverage(data, coverage) {
+  if (!coverage) return data;
   /** @type {Record<string, unknown>} */
   const shown = {};
   for (const [key, value] of Object.entries(data)) {
-    if (key === 'installed') {
-      shown.meanings = `${meanings.mapped} of ${meanings.total}`;
-    }
+    if (key === 'definitions') continue;
+    if (key === 'installed')
+      shown.definitions = definitionCoverageText(coverage);
     shown[key] = value;
   }
   return shown;
 }
+
+/** @param {string[]} names */
+const joinNames = names => names.join(', ');
 
 /**
  * Record options that summarize each item list to its first names.
@@ -452,7 +458,13 @@ export function registerDiscover(program) {
                 available.length > 0
                   ? records(available, {
                       ...listOpts,
-                      format: {...listOpts.format, description: firstSentence},
+                      format: {
+                        ...listOpts.format,
+                        description: firstSentence,
+                        // Icon sets are experimental (spec:AST-017 FR27).
+                        iconSets: (/** @type {string[]} */ names) =>
+                          `${(listOpts.format?.iconSets ?? joinNames)(names)} [experimental]`,
+                      },
                     })
                   : text(
                       !sources.some(s => s.status !== 'failed')
@@ -597,7 +609,7 @@ export function registerDiscover(program) {
           case 'discover.item': {
             const d = result.data;
             emit(
-              record(withIconSetMeanings(d, iconSetMeanings(result)), {
+              record(withIconSetCoverage(d, iconSetCoverageOf(result)), {
                 omit: ['install'],
               }),
               // A doc that adds sections to another package's topic says how
@@ -644,6 +656,7 @@ export function registerDiscover(program) {
                       : `${m.package}/${m.component}`;
                   const tags = [
                     m.kind && m.kind !== 'component' ? m.kind : '',
+                    m.experimental ? 'experimental' : '',
                     m.installed === false ? 'not installed' : '',
                   ].filter(Boolean);
                   return `${run} discover ${target}${tags.length ? `  (${tags.join(', ')})` : ''}`;

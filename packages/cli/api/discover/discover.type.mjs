@@ -150,6 +150,7 @@
  *   default?: {variant?: string},
  *   definitions?: string[],
  *   command?: string,
+ *   experimental?: true,
  *   sections?: string[],
  *   installed: boolean,
  *   installedAs?: string,
@@ -163,9 +164,10 @@
  *   its `map` covers (`definitions`), and `command`, which searches the set's icons. A source's
  *   entry carries `license` and `iconCount` when the source lists them; its
  *   `definitions` are listed only in a project that sets
- *   `experimental.iconSet`. The icon-set fields (`license`, `iconCount`,
- *   `default`, `definitions`, and `command`) are experimental: they may
- *   change or be removed in a patch release.
+ *   `experimental.iconSet`. An icon set carries `experimental: true`. The
+ *   icon-set fields (`license`, `iconCount`, `default`, `definitions`, and
+ *   `command`) are experimental: they may change or be removed in a patch
+ *   release.
  */
 
 /**
@@ -185,6 +187,8 @@
  * @property {boolean} installed Whether the project has the package.
  * @property {string} [title]
  * @property {string} [summary]
+ * @property {true} [experimental] Set on an icon set, an experimental kind
+ *   (spec:AST-017 FR27): consumers can leave such matches out.
  */
 
 /**

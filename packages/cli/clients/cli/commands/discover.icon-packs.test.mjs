@@ -18,6 +18,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import {runCli} from '../../../test-utils/run-cli.mjs';
+import {writeIconSetProject} from '../../../test-utils/icon-set-fixture.mjs';
 
 const PACK = {
   package: '@acme/glyph-pack',
@@ -65,11 +66,13 @@ const CHARTS = {
 /**
  * @param {object[]} packages
  * @param {boolean} optIn
+ * @param {string[]} [integrations]
  */
-const config = (packages, optIn) => `
+const config = (packages, optIn, integrations = []) => `
 const packages = ${JSON.stringify(packages)};
 export default {
   ${optIn ? "experimental: {iconSet: 'glyphs'}," : ''}
+  ${integrations.length > 0 ? `integrations: ${JSON.stringify(integrations)},` : ''}
   async discover({package: name}) {
     return {
       schemaVersion: 1,
@@ -166,7 +169,15 @@ describe('discover lists icon packs before a project opts in', () => {
         installed: false,
         title: 'Acme Glyphs',
         summary: 'Outline icons drawn on a 24px grid.',
+        experimental: true,
       });
+      const row = await run(cwd, ['discover', 'glyphs']);
+      expect(row).toMatch(
+        /discover @acme\/glyph-pack\/glyphs {2}\(icon-set, experimental, not installed\)$/m,
+      );
+      expect(await run(cwd, ['discover', '--available'])).toMatch(
+        /^iconSets: +glyphs \[experimental\]$/m,
+      );
     },
     TIMEOUT,
   );
@@ -184,15 +195,15 @@ describe('discover lists icon packs before a project opts in', () => {
         title: 'Acme Glyphs',
         license: 'MIT',
         iconCount: 412,
+        experimental: true,
         installed: false,
       });
       expect(page.data.install).toContain('@acme/glyph-pack');
-      // The coverage is text only; the JSON keeps its shape.
-      expect(page.data).not.toHaveProperty('meanings');
+      // The coverage is text only; the JSON lists no definitions.
       expect(page.data).not.toHaveProperty('definitions');
 
       const text = await run(cwd, ['discover', '@acme/glyph-pack/glyphs']);
-      expect(text).toMatch(/^meanings: +2 of \d+$/m);
+      expect(text).toMatch(/^definitions: +2\/\d+$/m);
       expect(text).toMatch(/^Then use its icon set:$/m);
       expect(text).toMatch(/experimental icon use glyphs$/m);
 
@@ -232,6 +243,85 @@ describe('discover lists icon packs before a project opts in', () => {
         expect(a).toBe(await run(optedIn, args));
         expect(a).not.toMatch(/icon-set|iconSets|icon use/);
       }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'keeps icon-set fields off other kinds: their item pages read as without them',
+    async () => {
+      const marked = {
+        ...CHARTS,
+        contributions: [
+          {
+            ...CHARTS.contributions[0],
+            iconCount: 3,
+            license: 'MIT',
+            definitions: ['close'],
+          },
+          {
+            kind: 'template',
+            name: 'pages/Report',
+            iconCount: 1,
+            definitions: ['search'],
+          },
+        ],
+      };
+      const bare = {
+        ...CHARTS,
+        contributions: [
+          CHARTS.contributions[0],
+          {kind: 'template', name: 'pages/Report'},
+        ],
+      };
+      const withFields = project('with-fields', [marked]);
+      const without = project('without', [bare]);
+      for (const args of [
+        ['discover', '@acme/charts/BarChart'],
+        ['discover', '@acme/charts/BarChart', '--json'],
+        ['discover', '@acme/charts/pages/Report'],
+        ['discover', '@acme/charts/pages/Report', '--json'],
+        ['discover', '--json'],
+      ]) {
+        expect(await run(withFields, args)).toBe(await run(without, args));
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'answers no installed set without the opt-in, and other stable commands still hide sets',
+    async () => {
+      const cwd = writeIconSetProject(path.join(tmpDir, 'installed'), {
+        config: null,
+      });
+      const pack = {
+        ...PACK,
+        package: '@acme/glyphs',
+        integration: '@acme/glyphs',
+      };
+      fs.writeFileSync(
+        path.join(cwd, 'astryx.config.mjs'),
+        config([pack], false, ['@acme/glyphs']),
+      );
+      const page = await runCli(['discover', '@acme/glyphs/glyphs', '--json'], {
+        cwd,
+      });
+      expect(page.status).not.toBe(0);
+      expect(page.stdout).not.toContain('"installed": true');
+      expect(page.stdout).not.toContain('experimental icon');
+      const list = JSON.parse(await run(cwd, ['discover', '--json']));
+      expect(
+        list.data.find((/** @type {any} */ e) => e.name === '@acme/glyphs'),
+      ).not.toHaveProperty('iconSets');
+      // `astryx search` never lists an icon set.
+      const found = JSON.parse(await run(cwd, ['search', 'glyphs', '--json']));
+      expect(
+        found.data.results.filter(
+          (/** @type {any} */ r) =>
+            r.name === 'glyphs' || /icon-set/u.test(JSON.stringify(r)),
+        ),
+      ).toEqual([]);
     },
     TIMEOUT,
   );

@@ -33,7 +33,7 @@ import {
   discoverPackages,
   findComponent,
   hasSources,
-  iconMeaningNames,
+  iconSetCoverage,
   loadReadKinds,
   optedIntoIconSets,
   officialDeclarations,
@@ -52,7 +52,7 @@ import {list} from './list/list.mjs';
 import {detail} from './detail/detail.mjs';
 import {doc, docFromResult} from './detail/doc/doc.mjs';
 import {item} from './detail/item/item.mjs';
-export {iconSetMeanings} from './detail/item/item.mjs';
+export {iconSetCoverageOf} from './detail/item/item.mjs';
 import {search} from './search/search.mjs';
 import {AstryxError} from '../error.mjs';
 import {ERROR_CODES} from '../../foundation/response/error-codes.mjs';
@@ -323,7 +323,7 @@ export async function discover(query, options = {}) {
       add: entry?.official ? addOfficial : add,
       installedAs,
       iconSets: optedIntoIconSets(project),
-      meaningNames: iconMeaningNames,
+      coverageOf: iconSetCoverage,
     };
     if (!target.item) return detail(packages, target.name, context);
     const found = item(packages, target.name, target.item, context);
