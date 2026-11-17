@@ -111,7 +111,7 @@ describe('init --remove', () => {
       ['team/astryx-project/SKILL.md', 'removed'],
     ]);
     expect(exists('.agents')).toBe(false);
-    expect(exists('team')).toBe(true);
+    expect(exists('team')).toBe(false);
     expect(exists('astryx.config.mjs')).toBe(false);
   });
 
