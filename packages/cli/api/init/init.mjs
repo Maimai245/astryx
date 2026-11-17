@@ -114,7 +114,7 @@ export async function init(options = {}, {cwd = process.cwd()} = {}) {
  * write each. `--to user` alone is `--user`: the same leaf and receipt.
  * @param {InitOptions} options
  * @param {string} cwd
- * @returns {Promise<import('./init.type.mjs').InitRunResponse | import('./init.type.mjs').InitUserResponse>}
+ * @returns {Promise<import('./init.type.mjs').InitRunResponse | import('./init.type.mjs').InitRemoveResponse | import('./init.type.mjs').InitUserResponse>}
  */
 async function initTo(options, cwd) {
   if (options.user) {
