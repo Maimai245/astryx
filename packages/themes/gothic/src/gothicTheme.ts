@@ -262,7 +262,8 @@ export const gothicTheme = defineTheme({
     '--color-warning-muted': yellow.dark[75],
 
     '--color-border': withAlpha(neutral.dark[95], '1a'),
-    '--color-border-emphasized': neutral.dark[40],
+    // Input and selector frames read at 3:1 on the field, the page and a card.
+    '--color-border-emphasized': neutral.dark[55],
 
     '--color-skeleton': neutral.dark[40],
     '--color-shadow': withAlpha(neutral.dark[0], '4d'),

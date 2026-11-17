@@ -14,6 +14,8 @@
  *   nested default card, a transparent card, a text field, inline code, an
  *   open menu, a selected segment, an input group addon, a step number, a
  *   banner and a striped table row (whose cell color the table root fixes);
+ * - every input's frame against its field, the page and a card (3:1, as a
+ *   control's boundary);
  * - secondary text on a selected row, a dropzone and a numbered citation on
  *   the page, and on a selected row and a numbered citation inside every
  *   card;
@@ -219,6 +221,19 @@ const CARD_ANCESTORS = [
   ],
 ];
 
+/** The parts that draw the input frame. */
+const INPUT_PARTS = [
+  'text-input',
+  'text-area',
+  'number-input',
+  'date-input',
+  'time-input',
+  'typeahead',
+  'tokenizer',
+  'selector',
+  'multi-selector',
+];
+
 /** Parts drawn on the accent tint, with their own rule's key. */
 const ON_ACCENT_TINT = {
   'selected item': ['item', 'selected'],
@@ -359,6 +374,33 @@ function rows() {
         const layers = [at(tokens, '--color-accent-muted'), body];
         for (const role of ['--color-text-primary', '--color-text-secondary'])
           push({...base, where, role, text: at(tokens, role), layers});
+      }
+      // An input's frame against the field inside it and the page or card
+      // around it: a control's boundary, held to 3:1 (non-text).
+      for (const part of INPUT_PARTS) {
+        const own = {...rule(theme, part)};
+        const tokens = themeTokens(theme, own);
+        const frame =
+          own.borderColor != null
+            ? resolveColor(own.borderColor, tokens, modeIndex)
+            : at(tokens, '--color-border-emphasized');
+        const field =
+          own.backgroundColor != null
+            ? resolveColor(own.backgroundColor, tokens, modeIndex)
+            : at(tokens, '--color-background-surface');
+        for (const [ground, layers] of [
+          ['its field', [field, body]],
+          ['the page', [body]],
+          ['a card', [at(page, '--color-background-card'), body]],
+        ])
+          push({
+            ...base,
+            needs: WCAG_AA.nonText,
+            where: `${part} frame on ${ground}`,
+            role: 'border',
+            text: frame,
+            layers,
+          });
       }
       // Status text on its pale status fill (a field status, a banner).
       for (const status of ['success', 'warning', 'error', 'info'])

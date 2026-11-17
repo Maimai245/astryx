@@ -392,7 +392,8 @@ export const butterTheme = defineTheme({
 
     // Border — softer taupe card outline (emphasized) in light mode.
     '--color-border': [neutral.light[85], withAlpha(neutral.dark[90], '1a')],
-    '--color-border-emphasized': [neutral.light[75], neutral.dark[60]],
+    // Input and selector frames read at 3:1 on the field, the page and a card.
+    '--color-border-emphasized': [neutral.light[60], neutral.dark[60]],
 
     // Effects
     '--color-skeleton': [neutral.light[85], neutral.dark[35]],
@@ -765,7 +766,8 @@ export const butterTheme = defineTheme({
       },
     },
 
-    // Inputs — softer border than default, more vertical breathing room.
+    // Inputs — the emphasized frame, which reads at 3:1, and more vertical
+    // breathing room.
     // Status modifiers also remap the semantic tokens locally so the
     // status icon + border read as the same vivid hue as the banner
     // (icons inherit from --color-{success,warning,error}).
@@ -773,7 +775,7 @@ export const butterTheme = defineTheme({
       base: {
         paddingBlock: 'var(--spacing-2)',
         paddingInline: 'var(--spacing-3)',
-        borderColor: 'var(--color-border)',
+        borderColor: 'var(--color-border-emphasized)',
       },
       ...INPUT_STATUS_VARS,
     },
@@ -781,7 +783,7 @@ export const butterTheme = defineTheme({
       base: {
         paddingBlock: 'var(--spacing-2)',
         paddingInline: 'var(--spacing-3)',
-        borderColor: 'var(--color-border)',
+        borderColor: 'var(--color-border-emphasized)',
       },
       ...INPUT_STATUS_VARS,
     },
@@ -789,7 +791,7 @@ export const butterTheme = defineTheme({
       base: {
         paddingBlock: 'var(--spacing-2)',
         paddingInline: 'var(--spacing-3)',
-        borderColor: 'var(--color-border)',
+        borderColor: 'var(--color-border-emphasized)',
       },
       ...INPUT_STATUS_VARS,
     },
@@ -797,7 +799,7 @@ export const butterTheme = defineTheme({
       base: {
         paddingBlock: 'var(--spacing-2)',
         paddingInline: 'var(--spacing-3)',
-        borderColor: 'var(--color-border)',
+        borderColor: 'var(--color-border-emphasized)',
       },
       ...INPUT_STATUS_VARS,
     },
@@ -805,7 +807,7 @@ export const butterTheme = defineTheme({
       base: {
         paddingBlock: 'var(--spacing-2)',
         paddingInline: 'var(--spacing-3)',
-        borderColor: 'var(--color-border)',
+        borderColor: 'var(--color-border-emphasized)',
       },
       ...INPUT_STATUS_VARS,
     },
@@ -813,7 +815,7 @@ export const butterTheme = defineTheme({
       base: {
         paddingBlock: 'var(--spacing-2)',
         paddingInline: 'var(--spacing-3)',
-        borderColor: 'var(--color-border)',
+        borderColor: 'var(--color-border-emphasized)',
       },
       ...INPUT_STATUS_VARS,
       'variant:secondary': SECONDARY_SELECTOR,
@@ -822,7 +824,7 @@ export const butterTheme = defineTheme({
       base: {
         paddingBlock: 'var(--spacing-2)',
         paddingInline: 'var(--spacing-3)',
-        borderColor: 'var(--color-border)',
+        borderColor: 'var(--color-border-emphasized)',
       },
       ...INPUT_STATUS_VARS,
       'variant:secondary': SECONDARY_SELECTOR,
@@ -832,7 +834,7 @@ export const butterTheme = defineTheme({
       base: {
         paddingBlock: 'var(--spacing-2)',
         paddingInline: 'var(--spacing-3)',
-        borderColor: 'var(--color-border)',
+        borderColor: 'var(--color-border-emphasized)',
       },
       ...INPUT_STATUS_VARS,
     },
@@ -840,7 +842,7 @@ export const butterTheme = defineTheme({
       base: {
         paddingBlock: 'var(--spacing-2)',
         paddingInline: 'var(--spacing-3)',
-        borderColor: 'var(--color-border)',
+        borderColor: 'var(--color-border-emphasized)',
       },
       ...INPUT_STATUS_VARS,
     },

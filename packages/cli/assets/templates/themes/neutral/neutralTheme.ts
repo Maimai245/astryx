@@ -162,7 +162,8 @@ export const neutralTheme = defineTheme({
       withAlpha(neutral.light[0], '14'),
       withAlpha(neutral.dark[100], '1A'),
     ],
-    '--color-border-emphasized': [neutral.light[85], neutral.dark[35]],
+    // Input and selector frames read at 3:1 on the field, the page and a card.
+    '--color-border-emphasized': [neutral.light[55], neutral.dark[50]],
 
     // Effects
     '--color-skeleton': [neutral.light[85], neutral.dark[35]],

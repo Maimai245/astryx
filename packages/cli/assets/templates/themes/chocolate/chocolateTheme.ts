@@ -188,7 +188,10 @@ export const chocolateTheme = defineTheme({
 
     // Border
     '--color-border': ['#C4AC95', '#EDE4D41A'],
-    '--color-border-emphasized': ['#B88859', '#6b5540'],
+    // Input and selector frames: stop 50 of the astryx-oklch-v1 ramp grown
+    // from #B88859 (anchored at its own stop, 60) in each mode, the nearest
+    // stop that reads at 3:1 on the field, the page and a card.
+    '--color-border-emphasized': ['#9e6d3b', '#a16b31'],
 
     // Effects
     '--color-skeleton': ['#C4AC95', '#6b5540'],
