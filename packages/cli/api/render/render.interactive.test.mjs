@@ -355,6 +355,56 @@ export default function Page() {
     dom.window.close();
   }, 120_000);
 
+  it('carries an image the page draws only after a click, and shows it then from the carried data', async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+      'base64',
+    );
+    put('drawn-later/public/pics/later.png', png);
+    put('drawn-later/src/near.png', png);
+    put(
+      'drawn-later/src/later.tsx',
+      `import {useState} from 'react';
+const photos = ['/pics/later.png', './near.png'];
+export default function Page() {
+  const [open, setOpen] = useState(false);
+  return (
+    <main>
+      <button type="button" onClick={() => setOpen(true)}>Show</button>
+      {open && photos.map(src => <img key={src} src={src} alt={src} />)}
+    </main>
+  );
+}
+`,
+    );
+    const rendered = /** @type {any} */ (
+      await render('drawn-later/src/later.tsx', {cwd: dir, out: 'drawn-later.html'})
+    );
+    expect(rendered.data.files).toEqual(
+      expect.arrayContaining(['public/pics/later.png', 'src/near.png']),
+    );
+    const dom = new JSDOM(read('drawn-later.html'), {
+      runScripts: 'dangerously',
+      pretendToBeVisual: true,
+    });
+    const settle = () => new Promise(resolve => dom.window.setTimeout(resolve, 100));
+    await settle();
+    const doc = dom.window.document;
+    expect(doc.querySelectorAll(`#${ROOT_ID} img`)).toHaveLength(0);
+    /** @type {HTMLButtonElement} */ (doc.querySelector(`#${ROOT_ID} button`)).click();
+    await settle();
+    const srcs = [...doc.querySelectorAll(`#${ROOT_ID} img`)].map(img => img.getAttribute('src'));
+    expect(srcs).toHaveLength(2);
+    for (const src of srcs) expect(src).toMatch(/^data:image\/png;base64,/);
+    dom.window.close();
+    const back = /** @type {any} */ (
+      await render('drawn-later.html', {cwd: dir, reverse: true, out: 'drawn-later-back/src/later.tsx'})
+    );
+    expect(back.data.exact).toBe(true);
+    expect(fs.readFileSync(path.join(dir, 'drawn-later-back/public/pics/later.png'))).toEqual(png);
+    expect(fs.readFileSync(path.join(dir, 'drawn-later-back/src/near.png'))).toEqual(png);
+  }, 120_000);
+
   it("keeps the first paint when the page's script throws, as in a frame that blocks storage", async () => {
     put(
       'src/saves.tsx',

@@ -1137,9 +1137,6 @@ export async function renderPage(entry, options = {}) {
   const used = classesIn(markup);
   /** The page's script; none in a markup-only render. @type {string | null} */
   const script = typeof message.script === 'string' ? message.script : null;
-  // The script draws the page again with the paths the page wrote, so each
-  // image the first paint shows from its carried data keeps showing.
-  const drawn = script === null ? null : withCarriedPaths(script, ctx.rewrites);
   // The script draws what the markup does not show yet (a menu as it opens,
   // the next tab), so the rules every class name it holds needs stay too.
   const kept = script ? new Set([...used, ...(script.match(/[A-Za-z_][\w-]*/g) ?? [])]) : used;
@@ -1381,16 +1378,30 @@ export async function renderPage(entry, options = {}) {
       continue;
     }
     for (const ref of assetRefsOf(text, file)) {
-      const asset = path.resolve(path.dirname(file), ref);
-      if (!isInside(asset, named)) continue;
-      if (isFileAt(asset)) {
-        carryAsset(
-          asset,
-          `named in ${path.relative(dir, file).split(path.sep).join('/')}`,
-        );
+      /** @type {string | null} */
+      let asset;
+      if (ref.startsWith('/')) {
+        const found = assetRef(ref, {dir, root: site});
+        asset = found?.kind === 'file' ? found.file : null;
+      } else {
+        asset = path.resolve(path.dirname(file), ref);
+        if (!isInside(asset, named) || !isFileAt(asset)) asset = null;
+      }
+      if (!asset) continue;
+      carryAsset(
+        asset,
+        `named in ${path.relative(dir, file).split(path.sep).join('/')}`,
+      );
+      // An image the page draws only later (the next view, a row below the
+      // fold) shows from the same carried data once the script draws it.
+      if (files.includes(asset) && !ctx.rewrites.has(ref)) {
+        ctx.rewrites.set(ref, assetDataUri(asset));
       }
     }
   }
+  // The script draws the page again with the paths the page wrote, so each
+  // carried image keeps showing, the first paint's and the ones drawn later.
+  const drawn = script === null ? null : withCarriedPaths(script, ctx.rewrites);
   // Paths are kept relative to the folder that holds every file: the page's
   // folder, or an ancestor when the page imports from above it, but never one
   // from which the page's own path holds a name a reverse refuses (a

@@ -126,15 +126,16 @@ export function moduleImports(source, file) {
 }
 
 /**
- * Relative asset paths in a piece of text: a `./`/`../` path to an image or
- * font, bare or inside `url(...)`.
+ * Asset paths in a piece of text: a `./`/`../` path, or a path from the
+ * site's root (`/pics/a.png`, served from `public/`), to an image or font,
+ * bare or inside `url(...)`.
  * @param {string} text
  * @returns {string[]}
  */
 export function assetRefsIn(text) {
   /** @type {string[]} */
   const out = [];
-  for (const m of text.matchAll(/(?:^|url\(\s*['"]?)(\.\.?\/[^'")\s]+)/g)) {
+  for (const m of text.matchAll(/(?:^|url\(\s*['"]?)(\.\.?\/[^'")\s]+|\/(?!\/)[^'")\s]+)/g)) {
     const ref = m[1].split(/[?#]/)[0];
     if (isAssetPath(ref)) out.push(ref);
   }
@@ -333,6 +334,23 @@ export function reachableFiles(files, {aliases = [], recorded} = {}) {
     }
     return {r, fresh};
   };
+  /**
+   * Where a path from the site's root lies in the tree: under the nearest
+   * `public/` folder at or above the page's folder, as the render read it.
+   * Null when there is none, or when the path leaves `public/`.
+   * @param {string} ref
+   */
+  const publicPath = ref => {
+    const page = files[0]?.path ?? '';
+    for (let d = path.posix.dirname(page); ; d = path.posix.dirname(d)) {
+      const dir = d === '.' ? 'public' : `${d}/public`;
+      if ([...byPath.keys()].some(p => p.startsWith(`${dir}/`))) {
+        const joined = path.posix.normalize(`${dir}/${ref.slice(1)}`);
+        return joined.startsWith(`${dir}/`) ? joined : null;
+      }
+      if (d === '.' || d === '/' || d === '') return null;
+    }
+  };
   /** @type {string[]} */
   const queue = [];
   if (files.length > 0) {
@@ -376,9 +394,14 @@ export function reachableFiles(files, {aliases = [], recorded} = {}) {
           assets: assetRefsOf(source, current),
         };
     for (const ref of scanned.assets) {
-      const joined = path.posix.normalize(
-        path.posix.join(path.posix.dirname(current), ref),
-      );
+      const joined = ref.startsWith('/')
+        ? publicPath(ref)
+        : path.posix.normalize(
+            path.posix.join(path.posix.dirname(current), ref),
+          );
+      // A path from the site's root names nothing when the tree holds no
+      // `public/` on the page's path: the render had none to read it from.
+      if (joined === null) continue;
       if (climbsOut(joined)) continue;
       if (!byPath.has(joined)) {
         missing.add(joined);
