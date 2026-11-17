@@ -103,6 +103,15 @@ describe('a paint drawn inside a part', () => {
       expect(keys.parts, q).toContain('kbd-key');
       expect(keys.writes.join('\n'), q).toMatch(/ --on kbd-key\b/);
     }
+    // The space between the keys is the gap of the shortcut that lays them
+    // out: written on kbd, never as padding on each key.
+    for (const q of [
+      'make the gap in the keyboard shortcut bigger',
+      'put more space between the keyboard keys',
+    ]) {
+      const gap = await answer(q, 'i');
+      expect(gap.writes[0], q).toMatch(/ --on kbd$/);
+    }
     const text = await answer('make the radio list item text red', 'i');
     expect(text.writes.join('\n')).not.toMatch(
       / color '#dc2626' --on radio-list-item/,
