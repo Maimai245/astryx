@@ -27,13 +27,26 @@ export const ICON_SECTION_LIMIT = 3;
  * @param {string} query
  * @param {{setNames: string[], sets: () => Promise<import('../../foundation/discovery/icon-set-discovery.mjs').DiscoveredIconSet[]>}} source
  *   the installed sets' names, and a read of the sets in tie order
- * @param {string[]} declaredNames the names of the components and hooks
- *   search reads
- * @param {number} limit the search's limit
+ * @param {{declaredNames: string[], resultDomains: string[], limit: number}} search
+ *   the names of the components and hooks search reads, the domains of its
+ *   results, and its limit
  * @returns {Promise<import('./search.type.mjs').SearchIconSection | null>}
  */
-export async function iconSection(query, source, declaredNames, limit) {
-  if (!asksForIcon(query, {setNames: source.setNames, declaredNames})) {
+export async function iconSection(
+  query,
+  source,
+  {declaredNames, resultDomains, limit},
+) {
+  const answersEntry = resultDomains.some(
+    domain => domain === 'component' || domain === 'template',
+  );
+  if (
+    !asksForIcon(query, {
+      setNames: source.setNames,
+      declaredNames,
+      answersEntry,
+    })
+  ) {
     return null;
   }
   const sets = await source.sets();
