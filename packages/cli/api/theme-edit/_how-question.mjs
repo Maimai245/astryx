@@ -6948,12 +6948,13 @@ export function draftAnswer(ctx, env, question) {
       const holderWord = partWord(holderText);
       const holder = holderWord?.on ?? null;
       if (!holder || !holderWord || !elementText.trim()) continue;
-      // "The space between the keys in the shortcut": the gap the place lays
-      // its parts out with, so the place, as the whole phrase names it (the
-      // lexicon reads a shortcut's gap as Kbd, its keys as their badges).
+      // "The space between the keys in the shortcut": a gap a lexicon phrase
+      // names whole (its matched words hold the gap word, as Kbd's do) is
+      // that part's, never a part named inside the place.
       if (/\b(?:gaps?|space|spacing|room)\s+between\b/i.test(elementText)) {
-        const on = partIn(`${elementText} ${by} ${holderText}`) ?? holder;
-        return {part: {on}, holder: on};
+        const whole = partWord(`${elementText} ${by} ${holderText}`);
+        if (whole && /\b(?:gaps?|space|spacing|room)\b/i.test(whole.word))
+          return {part: {on: whole.on}, holder: whole.on};
       }
       // (And the catalog part the place's own word names, when the lexicon
       // reads that word as another part: "the table" read as its rows is

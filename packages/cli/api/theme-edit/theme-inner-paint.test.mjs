@@ -125,6 +125,14 @@ describe('a paint drawn inside a part', () => {
       ['more space between the dividers', 'context-menu'],
       ['more space between the step labels', 'step'],
       ['more space between the slider thumb and the track', 'slider'],
+      ['more room between the buttons in the dialog footer', 'button'],
+      ['more space between the badges in the card', 'badge'],
+      ['more space between the chips in the tokenizer', 'badge'],
+      [
+        'more space between the pagination dots in the carousel',
+        'pagination-dot',
+      ],
+      ['more space between the list items inside the card', 'list-item'],
     ]) {
       const gap = await answer(q, 'i');
       expect(gap.writes.join('\n'), q).not.toMatch(
