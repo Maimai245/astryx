@@ -140,6 +140,27 @@ function carryScopeOf(dir, cwd) {
   return cwd && (dir === cwd || isInside(dir, cwd)) ? cwd : dir;
 }
 
+/**
+ * The folder whose `public/` holds the files a `/` path names: the page's
+ * project, when it holds `public/`. Else the nearest folder at or above the
+ * page's that holds `public/`, inside the folder whose files the page
+ * carries (a site that shares its project with others). Else the project's
+ * folder, else the page's.
+ * @param {string} dir the page's folder
+ * @param {string} scope the folder whose files the page carries
+ */
+function siteRootOf(dir, scope) {
+  /** @param {string} d */
+  const holdsPublic = d =>
+    fs.statSync(path.join(d, 'public'), {throwIfNoEntry: false})?.isDirectory() === true;
+  const project = projectOf(dir);
+  if (project && holdsPublic(project)) return project;
+  for (let d = dir; d === scope || isInside(d, scope); d = path.dirname(d)) {
+    if (holdsPublic(d)) return d;
+  }
+  return project ?? dir;
+}
+
 /** @param {string} s */
 const escapeHtml = s =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -776,7 +797,7 @@ export function cssUrlRef(m) {
  * and for callers that say what a page will not show.
  * @param {string} ref as written in src, poster or url()
  * @param {{dir: string, root: string}} at the folder it is relative to,
- *   and the project root (for `/` paths, `public/` first)
+ *   and the site's root, whose `public/` holds the files `/` paths name
  * A reference is URL text: it names the file its percent-escapes decode to
  * (`a%20b.png` is "a b.png"), as a browser and the app's bundler read it.
  * A file that cannot be read (no permission) is `unreadable`.
@@ -797,11 +818,15 @@ export function assetRef(ref, at) {
     named = clean;
   }
   if (!isAssetPath(named)) return null;
-  const candidates = named.startsWith('/')
-    ? [path.join(at.root, 'public', named), path.join(at.root, named)]
-    : [path.resolve(at.dir, named)];
-  const found = candidates.find(c => fs.existsSync(c));
-  if (!found) return {kind: 'missing', ref: clean};
+  const publicDir = path.join(at.root, 'public');
+  const found = named.startsWith('/')
+    ? path.join(publicDir, named)
+    : path.resolve(at.dir, named);
+  // A `/` path is served from public/ only; one that climbs out of it names
+  // no file of the site.
+  if (named.startsWith('/') && !isInside(found, publicDir))
+    return {kind: 'missing', ref: clean};
+  if (!fs.existsSync(found)) return {kind: 'missing', ref: clean};
   /** @type {fs.Stats | undefined} */
   let st;
   try {
@@ -882,8 +907,7 @@ function inlineAssets(text, kind, ctx) {
       return null;
     }
     ctx.counted.add(`file:${found}`);
-    // A relative path names a file that is part of the page: carry it.
-    if (!clean.startsWith('/')) ctx.localAssets.add(found);
+    ctx.localAssets.add(found);
     return assetDataUri(found);
   };
   /** @param {string} value */
@@ -979,10 +1003,8 @@ const SCHEME_CSS =
  */
 export async function renderPage(entry, options = {}) {
   const dir = path.dirname(entry);
-  // The project's folder, else the page's: where its tsconfig.json and
-  // public/ images are read.
-  const root = projectOf(dir) ?? dir;
   const scope = carryScopeOf(dir, options.cwd);
+  const root = siteRootOf(dir, scope);
   const served = options.served ?? null;
   /** @type {RenderWarning[]} */
   const warnings = [];

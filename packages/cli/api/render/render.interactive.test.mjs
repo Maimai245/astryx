@@ -327,6 +327,34 @@ export default function Page() {
     dom.window.close();
   }, 120_000);
 
+  it('keeps showing an image the page names by a path from the site root once the script draws the page', async () => {
+    put(
+      'site/public/pics/shoe.png',
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    );
+    put(
+      'site/src/shoe.tsx',
+      `const shoe = {src: '/pics/shoe.png'};
+export default function Page() {
+  return <main><img src={shoe.src} alt="Shoe" /></main>;
+}
+`,
+    );
+    await render('site/src/shoe.tsx', {cwd: dir, out: 'shoe.html'});
+    const dom = new JSDOM(read('shoe.html'), {
+      runScripts: 'dangerously',
+      pretendToBeVisual: true,
+    });
+    await new Promise(resolve => dom.window.setTimeout(resolve, 100));
+    const doc = dom.window.document;
+    expect(doc.querySelector(`#${ROOT_ID} img[alt="Shoe"]`)?.getAttribute('src')).toMatch(/^data:image\/png;base64,/);
+    expect(doc.getElementById(ROOT_ID)?.innerHTML).not.toContain('/pics/shoe.png');
+    dom.window.close();
+  }, 120_000);
+
   it("keeps the first paint when the page's script throws, as in a frame that blocks storage", async () => {
     put(
       'src/saves.tsx',
