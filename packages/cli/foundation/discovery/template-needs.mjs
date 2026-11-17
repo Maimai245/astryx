@@ -27,6 +27,7 @@ import {readStore, storedKey} from '../doc-compiler/stored-docs.mjs';
 import {CLI_ROOT, findWorkspaceRoot} from '../fs/paths.mjs';
 import {writtenString} from '../text/written-string.mjs';
 import {detectStylingSystem} from '../agent-docs/agent-docs.mjs';
+import {installGuidanceFor} from '../env/install-guidance.mjs';
 import {
   decidePackageManagerIn,
   formatCliCommand,
@@ -282,14 +283,16 @@ function cliPackageRanges() {
  * The command that installs `packages` in the project at `cwd`, in its package
  * manager and with the CLI workspace's version ranges. Null, with the reason,
  * when several lockfiles leave the package manager undetermined; null with no
- * reason when there is nothing to install.
+ * reason when there is nothing to install. `installGuidance` is the line the
+ * project's integrations give for adding packages, with the packages filled
+ * in, or null; where it is set, printers show it instead of the command.
  * @param {string[]} packages
  * @param {string} cwd
- * @returns {{installCommand: string | null, noCommandReason: string | null}}
+ * @returns {{installCommand: string | null, noCommandReason: string | null, installGuidance: string | null}}
  */
 export function installCommandFor(packages, cwd) {
   if (packages.length === 0) {
-    return {installCommand: null, noCommandReason: null};
+    return {installCommand: null, noCommandReason: null, installGuidance: null};
   }
   const resolved = resolveInstallVerb(cwd);
   const ranges = cliPackageRanges();
@@ -297,29 +300,35 @@ export function installCommandFor(packages, cwd) {
   const specs = packages.map(p =>
     ranges[p] && ranges[p] !== '*' ? `${p}@"${ranges[p]}"` : p,
   );
+  // Guidance names the bare packages: the integration's own rule picks versions.
+  const installGuidance = installGuidanceFor(packages, cwd) ?? null;
   if (resolved.verb !== null) {
     return {
       installCommand: `${resolved.verb} ${specs.join(' ')}`,
       noCommandReason: null,
+      installGuidance,
     };
   }
   const where = path.relative(cwd, resolved.dir) || '.';
   return {
     installCommand: null,
     noCommandReason: `Install missing dependencies: ${specs.join(' ')}. No install command: ${where} has ${resolved.lockfiles.join(' and ')}, and nothing there says which package manager to use.`,
+    installGuidance,
   };
 }
 
 /**
- * The install step to print for `packages` in the project at `cwd`: its
- * package manager's command, or `npm install` with a note naming the folder
- * whose lockfiles disagree when the package manager cannot be decided.
+ * The install step to print for `packages` in the project at `cwd`: the
+ * install guidance its integrations give, else its package manager's command,
+ * or `npm install` with a note naming the folder whose lockfiles disagree when
+ * the package manager cannot be decided.
  * @param {string[]} packages
  * @param {string} cwd
  * @returns {{line: string, note: string | null}}
  */
 export function installStepFor(packages, cwd) {
-  const {installCommand} = installCommandFor(packages, cwd);
+  const {installCommand, installGuidance} = installCommandFor(packages, cwd);
+  if (installGuidance) return {line: installGuidance, note: null};
   if (installCommand) return {line: installCommand, note: null};
   const resolved = resolveInstallVerb(cwd);
   const where =
@@ -343,6 +352,7 @@ export function installStepFor(packages, cwd) {
  *   notes: string[],
  *   missingPackages: string[],
  *   installCommand: string | null,
+ *   installGuidance: string | null,
  * }}
  */
 export function analyzeTemplateNeeds(source, cwd) {
@@ -370,7 +380,10 @@ export function analyzeTemplateNeeds(source, cwd) {
 
   const missing = external.filter(p => !(p in projectDeps));
 
-  const {installCommand, noCommandReason} = installCommandFor(missing, cwd);
+  const {installCommand, noCommandReason, installGuidance} = installCommandFor(
+    missing,
+    cwd,
+  );
 
   // ── StyleX compiler ────────────────────────────────────────────────────
   const usesStylex = imported.has(STYLEX_RUNTIME);
@@ -382,9 +395,11 @@ export function analyzeTemplateNeeds(source, cwd) {
   const notes = [];
   if (missing.length > 0) {
     notes.push(
-      installCommand
-        ? `Install missing dependencies: ${installCommand}`
-        : (noCommandReason ?? ''),
+      installGuidance
+        ? `Install missing dependencies: ${installGuidance}`
+        : installCommand
+          ? `Install missing dependencies: ${installCommand}`
+          : (noCommandReason ?? ''),
     );
   }
   if (stylexCompilerNeeded) {
@@ -393,5 +408,5 @@ export function analyzeTemplateNeeds(source, cwd) {
     );
   }
 
-  return {notes, missingPackages: missing, installCommand};
+  return {notes, missingPackages: missing, installCommand, installGuidance};
 }

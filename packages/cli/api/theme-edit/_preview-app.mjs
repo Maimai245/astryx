@@ -104,6 +104,7 @@ import {ERROR_CODES} from '../../foundation/response/error-codes.mjs';
 import {AstryxError} from '../error.mjs';
 import {
   formatCliCommand,
+  installDependenciesCommand,
   quoteCommandArgument,
 } from '../../foundation/env/package-manager.mjs';
 import {sha256} from '../../foundation/render/source-block.mjs';
@@ -4033,7 +4034,7 @@ function appRootOf(cwd, dir) {
  * @param {string} cwd
  * @param {string} source
  */
-function pageNeeds(cwd, source) {
+export function pageNeeds(cwd, source) {
   const pkgs = [...extractImportedPackages(source)];
   const needs = analyzeTemplateNeeds(source, cwd);
   /** @type {Record<string, string>} */
@@ -4062,28 +4063,27 @@ function pageNeeds(cwd, source) {
   const undeclared = absent.filter(p => !(p in declared));
   const missingPackages = [...needs.missingPackages, ...undeclared];
   const commands = [
-    ...(needs.installCommand
-      ? [[needs.installCommand, ...undeclared].join(' ')]
-      : undeclared.length
-        ? [installLine(cwd, undeclared)]
-        : []),
-    ...(notInstalled.length ? [installCommandOf(cwd)] : []),
+    ...(needs.installGuidance
+      ? [installLine(cwd, [...needs.missingPackages, ...undeclared])]
+      : needs.installCommand
+        ? [[needs.installCommand, ...undeclared].join(' ')]
+        : undeclared.length
+          ? [installLine(cwd, undeclared)]
+          : []),
+    ...(notInstalled.length ? [installDependenciesCommand(cwd)] : []),
   ];
   return {
     missingPackages,
     notInstalled,
     installCommand: commands.length ? commands.join(' && ') : null,
-    noCommand: needs.missingPackages.length > 0 && !needs.installCommand,
+    noCommand:
+      needs.missingPackages.length > 0 &&
+      !needs.installCommand &&
+      !needs.installGuidance,
     stylexCompiler:
       pkgs.includes('@stylexjs/stylex') &&
       detectStylingSystem(cwd) !== 'stylex',
   };
-}
-
-/** The command that installs what the package.json names. @param {string} cwd */
-function installCommandOf(cwd) {
-  // The package manager `installLine` names, with its install verb.
-  return installLine(cwd, []).trim().replace(/ add$/, ' install');
 }
 
 /**

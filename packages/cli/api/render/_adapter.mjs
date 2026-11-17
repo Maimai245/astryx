@@ -13,6 +13,7 @@ import * as path from 'node:path';
 import {freeRestoreFolder} from '../../foundation/render/restore-folder.mjs';
 import {randomUUID} from 'node:crypto';
 import {createRequire} from 'node:module';
+import {installStepFor} from '../../foundation/discovery/template-needs.mjs';
 import {AstryxError} from '../error.mjs';
 import {ERROR_CODES} from '../../foundation/response/error-codes.mjs';
 import {
@@ -406,14 +407,20 @@ function writeRestore(writes, folder, cwd, overwrite) {
   return true;
 }
 
-/** @param {unknown} e */
-function asAstryxError(e) {
+/** @param {unknown} e @param {string} [cwd] the project the page belongs to */
+function asAstryxError(e, cwd = process.cwd()) {
   if (e instanceof RenderError) {
     const code = /** @type {import('../../foundation/response/error-codes.mjs').ErrorCode} */ (e.code);
     /** @type {{name: string, reason: string}[]} */
     const suggestions = [];
     if (e.code === 'ERR_RENDER_MISSING_DEPENDENCY' && typeof e.detail?.package === 'string') {
-      suggestions.push({name: `npm install ${e.detail.package}`, reason: 'install the package the page imports'});
+      const {line, note} = installStepFor([e.detail.package], cwd);
+      suggestions.push({
+        name: line,
+        reason: note
+          ? `install the package the page imports (${note})`
+          : 'install the package the page imports',
+      });
     }
     return new AstryxError(e.message, suggestions, code);
   }
@@ -475,7 +482,7 @@ export async function renderToFile({cwd, input, output, title, absolute = false}
       throw e;
     }
   } catch (e) {
-    throw asAstryxError(e);
+    throw asAstryxError(e, cwd);
   }
   for (const {name, dir} of page.fromSet) {
     let version = null;

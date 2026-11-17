@@ -50,6 +50,7 @@ import {
 } from '../../authoring/discover/parse.mjs';
 import {AstryxError} from '../error.mjs';
 import {ERROR_CODES} from '../../foundation/response/error-codes.mjs';
+import {installGuidanceFor} from '../../foundation/env/install-guidance.mjs';
 
 const SOURCE_TIMEOUT_MS = 30_000;
 
@@ -610,8 +611,14 @@ export function addCommand(project, {official = []} = {}) {
   const verb = (name, version) =>
     addVerbFor(cwd, name.startsWith('@astryxdesign/') ? version : null);
   return (name, version) => {
-    if (version) return `${verb(name, version)} ${name}@${version}`;
     const pin = byName.get(name)?.pin;
+    // The guidance names the same version the command would add.
+    const guidance = installGuidanceFor(
+      [version ? `${name}@${version}` : pin ? `${name}@${pin}` : name],
+      cwd,
+    );
+    if (guidance != null) return guidance;
+    if (version) return `${verb(name, version)} ${name}@${version}`;
     if (!pin) return `${verb(name, null)} ${name}`;
     return isValidSemver(pin)
       ? `${verb(name, pin)} ${name}@${pin}`

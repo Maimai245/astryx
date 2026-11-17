@@ -36,6 +36,7 @@ import {
   oncePerListing,
   withListingCache,
 } from '../../foundation/fs/listing-cache.mjs';
+import {installGuidanceFor} from '../../foundation/env/install-guidance.mjs';
 
 /**
  * @typedef {object} ThemeProject
@@ -123,6 +124,8 @@ function nodeModulesRoot(dir) {
  * @param {string[]} packages
  */
 export function installLine(cwd, packages) {
+  const guidance = installGuidanceFor(packages, cwd);
+  if (guidance != null) return guidance;
   const pm = detectPackageManager(cwd);
   return `${pm === 'npm' || pm === 'npx' ? 'npm install' : `${pm} add`} ${packages.join(' ')}`;
 }

@@ -156,7 +156,7 @@
  * `missingPackages` names the packages the fork imports that the app does not
  * declare (empty when none); `installCommand` installs them, and is null when
  * none are missing or the package manager is undetermined.
- * @property {{slug: string, displayName: string, maintained: boolean, package: string, outputDir: string, entry: string, exportName: string, files: string[], missingPackages: string[], installCommand: string | null}} data
+ * @property {{slug: string, displayName: string, maintained: boolean, package: string, outputDir: string, entry: string, exportName: string, files: string[], missingPackages: string[], installCommand: string | null, installGuidance?: string}} data
  */
 
 /**
