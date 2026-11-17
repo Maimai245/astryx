@@ -2297,14 +2297,18 @@ export function checkComputerAgentText(ctx) {
   const folders =
     ctx.agentTextFolders ??
     (state ? state.folders : []);
-  const staleFolders = folders.filter(f => f.state === 'absent' || f.state === 'differs');
+  const staleFolders = folders.filter(f => f.state === 'differs');
+  const deletedFolders = folders.filter(f => f.state === 'absent');
   const keptFolders = folders.filter(f => f.state === 'edited' || f.state === 'foreign');
   const folderNote =
     (folders.length > 0
       ? ` Also in the folders \`init --to\` saved: ${folders.map(f => f.path).join(', ')}.`
       : '') +
     (staleFolders.length > 0
-      ? ` Missing or out of date there: ${staleFolders.map(f => f.path).join(', ')}; the CLI installed for the computer refreshes them after its next upgrade, and \`astryx init --to <folder>\` writes one now.`
+      ? ` From another release there: ${staleFolders.map(f => f.path).join(', ')}; the CLI installed for the computer refreshes them after its next upgrade, and \`astryx init --to <folder>\` writes one now.`
+      : '') +
+    (deletedFolders.length > 0
+      ? ` Deleted there, so not refreshed: ${deletedFolders.map(f => f.path).join(', ')}; \`astryx init --to <folder>\` writes one again.`
       : '') +
     (keptFolders.length > 0
       ? ` Kept as they are (edited, or not written by Astryx): ${keptFolders.map(f => f.path).join(', ')}.`
