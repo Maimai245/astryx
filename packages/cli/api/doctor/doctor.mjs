@@ -1038,7 +1038,8 @@ export function checkSkillPlaces(ctx) {
       fix: `Keep one place: ${init(`--to ${saved}`)} moves the project to its saved places and removes the other.`,
     };
   }
-  const stale = report.files.filter(file => file.state === 'absent' || file.state === 'differs');
+  const missing = report.files.filter(file => file.state === 'absent');
+  const stale = report.files.filter(file => file.state === 'differs');
   const kept = report.files.filter(file => file.state === 'edited' || file.state === 'foreign');
   const keptNote =
     kept.length > 0
@@ -1047,11 +1048,15 @@ export function checkSkillPlaces(ctx) {
   const codexNote = report.computerSkill && report.skillFiles.length > 0
     ? ' This computer also has the computer-level `astryx` skill, so Codex lists both skills.'
     : '';
-  if (stale.length > 0) {
+  if (missing.length > 0 || stale.length > 0) {
+    const missingNote =
+      missing.length > 0 ? ` The Astryx skill is missing from ${missing.map(file => file.path).join(', ')}.` : '';
+    const staleNote =
+      stale.length > 0 ? ` It is from another release in ${stale.map(file => file.path).join(', ')}.` : '';
     return {
       ...base,
       status: 'warn',
-      message: `The Astryx skill is missing or out of date in ${stale.map(file => file.path).join(', ')}.${keptNote}${codexNote}`,
+      message: `${(missingNote + staleNote).trim()}${keptNote}${codexNote}`,
       fix: `Run ${init('')} to write the saved places (\`astryx upgrade --apply\` also refreshes them).`,
     };
   }
@@ -2289,11 +2294,26 @@ export function checkComputerAgentText(ctx) {
     label: 'Computer-level agent text',
     status: /** @type {const} */ ('info'),
   };
+  const folders =
+    ctx.agentTextFolders ??
+    (state ? state.folders : []);
+  const staleFolders = folders.filter(f => f.state === 'absent' || f.state === 'differs');
+  const keptFolders = folders.filter(f => f.state === 'edited' || f.state === 'foreign');
+  const folderNote =
+    (folders.length > 0
+      ? ` Also in the folders \`init --to\` saved: ${folders.map(f => f.path).join(', ')}.`
+      : '') +
+    (staleFolders.length > 0
+      ? ` Missing or out of date there: ${staleFolders.map(f => f.path).join(', ')}; the CLI installed for the computer refreshes them after its next upgrade, and \`astryx init --to <folder>\` writes one now.`
+      : '') +
+    (keptFolders.length > 0
+      ? ` Kept as they are (edited, or not written by Astryx): ${keptFolders.map(f => f.path).join(', ')}.`
+      : '');
   if (!settings.install) {
     return {
       ...base,
       message:
-        'The computer-level agent text is turned off (`astryx init --user --remove-agents`), so the CLI installed for the computer does not write it.',
+        `The computer-level agent text is turned off (\`astryx init --user --remove-agents\`), so the CLI installed for the computer does not write it.${folderNote}`,
       fix: `To turn it back on, run \`${formatCliCommand('astryx init --user', ctx.cwd)}\`.`,
     };
   }
@@ -2318,21 +2338,6 @@ export function checkComputerAgentText(ctx) {
   const missing = links
     .filter(l => l.state === 'absent' || l.state === 'differs')
     .map(home);
-  const folders =
-    ctx.agentTextFolders ??
-    (state ? state.folders : []);
-  const staleFolders = folders.filter(f => f.state === 'absent' || f.state === 'differs');
-  const keptFolders = folders.filter(f => f.state === 'edited' || f.state === 'foreign');
-  const folderNote =
-    (folders.length > 0
-      ? ` Also in the folders \`init --to\` saved: ${folders.map(f => f.path).join(', ')}.`
-      : '') +
-    (staleFolders.length > 0
-      ? ` Missing or out of date there: ${staleFolders.map(f => f.path).join(', ')}; the CLI installed for the computer refreshes them after its next upgrade, and \`astryx init --to <folder>\` writes one now.`
-      : '') +
-    (keptFolders.length > 0
-      ? ` Kept as they are (edited, or not written by Astryx): ${keptFolders.map(f => f.path).join(', ')}.`
-      : '');
   const linkNote =
     folderNote +
     (linked.length > 0 ? ` Linked into: ${linked.join(', ')}.` : '') +

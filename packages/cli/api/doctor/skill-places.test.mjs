@@ -67,7 +67,7 @@ describe('the skill-places check', () => {
     fs.rmSync(path.join(project, SHARED));
     const result = await check('skill-places');
     expect(result).toMatchObject({status: 'warn'});
-    expect(result?.message).toContain(SHARED);
+    expect(result?.message).toContain(`missing from ${SHARED}`);
     expect(result?.fix).toContain('init');
   });
 
@@ -113,5 +113,16 @@ describe('the skill-places check', () => {
     expect(result).toMatchObject({status: 'pass'});
     expect(result?.message).toContain('Kept as they are');
     expect(result?.message).toContain('Codex lists both');
+  });
+
+  it('names the saved computer folders when the computer-level text is turned off', async () => {
+    await init({to: 'user'}, {cwd: project});
+    await init({user: true, removeAgents: true}, {cwd: project});
+    await init({to: '~/team-skills'}, {cwd: project});
+    const outside = tmp('outside');
+    const report = await runChecks({cwd: outside});
+    const agentText = report.checks.find(each => each.id === 'computer-agent-text');
+    expect(agentText?.message).toContain('turned off');
+    expect(agentText?.message).toContain('~/team-skills');
   });
 });

@@ -15,6 +15,7 @@
 
 import * as fs from 'node:fs';
 import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   COMPUTER_COMMAND,
   COMPUTER_INSTALL_STEP,
@@ -38,6 +39,7 @@ import {
 import {resolveAgentDocsRoot} from '../../foundation/agent-docs/agent-docs-target.mjs';
 import {renderAgentDocsBlock} from '../../foundation/agent-docs/agent-docs.mjs';
 import {
+  placeSkillFiles,
   projectPlacesValue,
   renderProjectSkill,
 } from '../../foundation/agent-docs/skill-places.mjs';
