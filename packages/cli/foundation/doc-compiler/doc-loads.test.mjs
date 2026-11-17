@@ -197,11 +197,11 @@ const RUNNERS = {
       'import ../experimental-theme.doc.mjs',
     ],
   },
-  'clients/cli/commands/experimental/render.mjs': {
+  'clients/cli/commands/experimental/export.mjs': {
     runs: SELF_DOCS,
     sites: [
       'import ../../../../api/render/render.doc.mjs',
-      'import ../experimental-render.doc.mjs',
+      'import ../experimental-export.doc.mjs',
     ],
   },
   'clients/cli/commands/manifest.mjs': {
@@ -450,7 +450,7 @@ const RUNNERS = {
     sites: ['importDocModule', 'importNativeModule ×3', 'importTemplateModule'],
   },
   'foundation/render/page-worker.mjs': {
-    runs: "the page `astryx experimental render` renders, its local modules, React, and the StyleX compiler, in a worker thread of the render host process (React DOM's client first, with a small document in place, so it reads the features a browser has), then React DOM and the recharts settings to draw its charts and the overlays it shows or opens (placed after it, or where the page asked through the global it installs for that); outside a project, Node resolves the packages its folder lacks, and React and StyleX for every module (resolve hooks for ES modules), from the package set the CLI runs from; and the esbuild the CLI depends on, to bundle the page's script",
+    runs: "the page `astryx experimental export` renders, its local modules, React, and the StyleX compiler, in a worker thread of the render host process (React DOM's client first, with a small document in place, so it reads the features a browser has), then React DOM and the recharts settings to draw its charts and the overlays it shows or opens (placed after it, or where the page asked through the global it installs for that); outside a project, Node resolves the packages its folder lacks, and React and StyleX for every module (resolve hooks for ES modules), from the package set the CLI runs from; and the esbuild the CLI depends on, to bundle the page's script",
     sites: [
       '.import() ×11',
       'createJiti ×2',
