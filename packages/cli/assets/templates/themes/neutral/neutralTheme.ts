@@ -389,9 +389,11 @@ export const neutralTheme = defineTheme({
       },
     },
 
+    // The progress track keeps its pale gray, so a value drawn on it reads
+    // at 3:1 whatever the accent; the emphasized border is the input frame.
     'progress-bar': {
       base: {
-        '--color-background-muted': 'var(--color-border-emphasized)',
+        '--color-background-muted': `light-dark(${neutral.light[85]}, ${neutral.dark[35]})`,
       },
     },
 
