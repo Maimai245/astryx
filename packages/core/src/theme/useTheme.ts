@@ -65,12 +65,19 @@ export const ThemeContext = createSharedContext<ThemeContextValue | null>(
 ThemeContext.displayName = 'ThemeContext';
 
 /**
- * The nearest Theme's mode, also when that Theme applies no theme of its own
- * (its `theme` is not a defined theme, so it provides no ThemeContext).
- * null when no Theme is above.
+ * The nearest Theme's mode. It is also set when no theme applies there and
+ * ThemeContext is null. `themeless` is true when no theme applies anywhere up
+ * to the page's root Theme, so `<html>` names no theme and nothing below
+ * needs to watch it.
  * @internal Not exported from the theme barrel.
  */
-export const ThemeModeContext = createSharedContext<ThemeMode | null>(
+export interface ThemeModeValue {
+  mode: ThemeMode;
+  themeless: boolean;
+}
+
+/** @internal Not exported from the theme barrel. */
+export const ThemeModeContext = createSharedContext<ThemeModeValue | null>(
   'ThemeModeContext',
   1,
   null,
@@ -386,8 +393,9 @@ function useRootThemeNameAttr(hasCtx: boolean): string | null {
  */
 export function useThemeName(): string | null {
   const ctx = use(ThemeContext);
+  const themeless = use(ThemeModeContext)?.themeless === true;
   const hasCtx = ctx != null;
-  const rootThemeName = useRootThemeNameAttr(hasCtx);
+  const rootThemeName = useRootThemeNameAttr(hasCtx || themeless);
 
   return ctx?.theme.name ?? rootThemeName;
 }
@@ -402,8 +410,9 @@ export function useThemeName(): string | null {
 export function useThemeDefinition(enabled = true): DefinedTheme | undefined {
   // `use` may be called conditionally, unlike the other hooks.
   const ctx = enabled ? use(ThemeContext) : null;
+  const themeless = enabled && use(ThemeModeContext)?.themeless === true;
   const hasCtx = ctx != null;
-  const rootThemeName = useRootThemeNameAttr(hasCtx || !enabled);
+  const rootThemeName = useRootThemeNameAttr(hasCtx || themeless || !enabled);
   if (!enabled) {
     return undefined;
   }
@@ -437,7 +446,8 @@ export function useThemeDefinition(enabled = true): DefinedTheme | undefined {
  */
 export function useTheme(): UseThemeReturn {
   const ctx = use(ThemeContext);
-  const nearestMode = use(ThemeModeContext);
+  const nearest = use(ThemeModeContext);
+  const nearestMode = nearest?.mode;
   const systemScheme = use(SystemSchemeContext);
 
   // Falls back to the root Theme's mode via <html data-theme> when there's
@@ -445,7 +455,9 @@ export function useTheme(): UseThemeReturn {
   // null when a Theme is above, so it has no effect there.
   const hasCtx = ctx != null;
   const rootAttrMode = useRootModeAttr(hasCtx || nearestMode != null);
-  const rootThemeName = useRootThemeNameAttr(hasCtx);
+  const rootThemeName = useRootThemeNameAttr(
+    hasCtx || nearest?.themeless === true,
+  );
 
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
 
