@@ -60,7 +60,8 @@ import {logger} from '../../logger.mjs';
 /**
  * The places one run writes. `previous`: with `--to`, the project places the
  * config saved before it, which the run moves off; null without `--to`.
- * @typedef {{places: import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace[], projectRoot: string | null, previous: import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace[] | null}} InitPlaces
+ * `homeRefusal`: why the project root takes no project place (checkPlaces).
+ * @typedef {{places: import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace[], projectRoot: string | null, previous: import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace[] | null, homeRefusal?: string}} InitPlaces
  */
 
 export const VALID_FEATURES = ['agents', 'theme', 'template'];
@@ -356,29 +357,15 @@ async function applyPlaces(cwd, options, invocation, data, given) {
     previous && projectRoot && projectPlaces.length > 0
       ? previous.filter(place => !kept.has(savedName(place)))
       : [];
-  // A project root in the home folder, or in a settings folder in it (such
-  // as `~/.claude` holding a package.json), takes no project place, as it
-  // takes no agent docs (architecture:cli-surface INV31): nothing in it is
-  // saved or written. The computer places still are.
-  if (projectRoot && projectPlaces.length > 0) {
-    try {
-      assertAgentDocsTarget(projectRoot);
-    } catch (err) {
-      if (!(err instanceof AgentDocsHomeError)) throw err;
-      logger.warn(`Note: ${err.message}`);
-      data.docsError = {kind: 'install-failed', message: err.message};
-      return applyComputerPlaces(places, data, record);
-    }
+  // A project root in the home folder, or a settings folder in it, takes no
+  // project place (checkPlaces); the computer places still are written.
+  if (given.homeRefusal) {
+    logger.warn(`Note: ${given.homeRefusal}`);
+    data.docsError = {kind: 'install-failed', message: given.homeRefusal};
+    return applyComputerPlaces(places, data, record);
   }
-  // Everything that can stop the run comes before any change: each project
-  // skill file stays inside the project (a skills folder linked out of it,
-  // such as `.claude` linked to `~/.claude`, is refused), the skill renders,
-  // and the config takes the record.
-  if (projectRoot) {
-    for (const place of [...skillPlaces, ...leaving]) {
-      if (place.kind !== 'agents-md') assertPlaceWithin(place, projectRoot);
-    }
-  }
+  // What can still stop the run comes before any place changes: the skill
+  // renders, and the config takes the record.
   const text =
     skillPlaces.length > 0 && projectRoot ? await projectSkillText(projectRoot) : null;
   if (previous && projectRoot && projectPlaces.length > 0) {
@@ -393,22 +380,36 @@ async function applyPlaces(cwd, options, invocation, data, given) {
   // all a person's own is kept as it is, so it holds no Astryx text.
   let landed = false;
   if (text != null && projectRoot) {
+    /** @type {string[]} */
+    const actions = [];
     for (const place of skillPlaces) {
       const rows = writeSkillPlace(place, projectRoot, text);
       if (rows.some(row => row.action !== 'kept')) landed = true;
+      actions.push(...rows.map(row => row.action));
       record(place, rows);
+    }
+    // Without the block, the project skill files say whether the project
+    // was set up before this run, as the agent docs do for the block.
+    if (!projectPlaces.some(place => place.kind === 'agents-md')) {
+      data.agentDocsStatus = actions.every(action => action === 'unchanged')
+        ? 'current'
+        : actions.every(action => action === 'created')
+          ? 'missing'
+          : 'stale';
     }
   }
   // The old places are cleared only when a new one holds the guidance: when
   // every new place is a person's own file, the old ones stay, so the project
   // never ends with no Astryx text.
   const blockStays = projectPlaces.some(place => place.kind === 'agents-md');
-  if (leaving.length > 0 && !blockStays && !landed) {
+  if (leaving.length > 0 && !(blockStays && data.docsError == null) && !landed) {
     logger.warn(
       `Note: Kept the Astryx guidance in ${leaving.map(savedName).join(', ')}: every new place holds a file Astryx did not write or one you edited, so nothing else holds it yet.`,
     );
   }
-  for (const place of blockStays || landed ? leaving : []) {
+  // A block write that failed (data.docsError) holds no text either.
+  const blockLanded = blockStays && data.docsError == null;
+  for (const place of blockLanded || landed ? leaving : []) {
     if (place.kind !== 'agents-md') {
       record(place, removeSkillPlace(place, /** @type {string} */ (projectRoot)));
       continue;
@@ -429,6 +430,39 @@ async function applyPlaces(cwd, options, invocation, data, given) {
 
   await applyComputerPlaces(places, data, record);
 
+}
+
+/**
+ * Check the places before anything is written, by any feature: a project
+ * root in the home folder, or in a settings folder in it (such as
+ * `~/.claude` holding a package.json), takes no project place, as it takes
+ * no agent docs (architecture:cli-surface INV31), and each project skill
+ * file to write or clear stays inside the project (a skills folder linked
+ * out of it, such as `.claude` linked to `~/.claude`, is refused). Returns
+ * the places with the refusal, if any, recorded.
+ * @param {InitPlaces} given
+ * @returns {InitPlaces}
+ */
+function checkPlaces(given) {
+  const {places, projectRoot, previous} = given;
+  const projectPlaces = places.filter(place => place.scope === 'project');
+  // The block alone keeps its own checks (applyAgents), so plain init and
+  // `--agent-docs-path` behave as before.
+  if (!projectRoot || projectPlaces.every(place => place.kind === 'agents-md')) {
+    return given;
+  }
+  try {
+    assertAgentDocsTarget(projectRoot);
+  } catch (err) {
+    if (!(err instanceof AgentDocsHomeError)) throw err;
+    return {...given, homeRefusal: err.message};
+  }
+  const kept = new Set(projectPlaces.map(savedName));
+  const leaving = previous ? previous.filter(place => !kept.has(savedName(place))) : [];
+  for (const place of [...projectPlaces, ...leaving]) {
+    if (place.kind !== 'agents-md') assertPlaceWithin(place, projectRoot);
+  }
+  return given;
 }
 
 /**
@@ -612,6 +646,9 @@ export async function run(options = {}, {cwd = process.cwd(), places} = {}) {
 
   // Non-interactive feature install: --features or --all.
   const features = parseFeatures(options);
+  // The places are checked before any feature writes anything.
+  const checked =
+    !features || features.includes('agents') ? checkPlaces(await placesFor(cwd, places)) : null;
   if (features) {
 
     /** @type {import('../init.type.mjs').InitRunData} */
@@ -634,7 +671,7 @@ export async function run(options = {}, {cwd = process.cwd(), places} = {}) {
     };
     for (const feature of features) {
       if (feature === 'agents') {
-        await applyPlaces(cwd, options, invocation, data, await placesFor(cwd, places));
+        await applyPlaces(cwd, options, invocation, data, /** @type {InitPlaces} */ (checked));
       }
       if (feature === 'theme') applyTheme(cwd, invocation, data);
       if (feature === 'template') {
@@ -668,7 +705,7 @@ export async function run(options = {}, {cwd = process.cwd(), places} = {}) {
     skills: [],
     user: null,
   };
-  await applyPlaces(cwd, options, invocation, data, await placesFor(cwd, places));
+  await applyPlaces(cwd, options, invocation, data, /** @type {InitPlaces} */ (checked));
   // A project whose agent docs were all current before this run is set up:
   // the install steps would only repeat setup.
   const setUp = !outside && data.agentDocsStatus === 'current';

@@ -41,6 +41,9 @@ import {
 } from '../../foundation/agent-docs/computer-agent-text.mjs';
 import {computerAgentTextSettings} from '../../foundation/env/user-settings.mjs';
 import * as fs from 'node:fs';
+import {resolveAgentDocsRoot} from '../../foundation/agent-docs/agent-docs-target.mjs';
+import {placeSkillFiles} from '../../foundation/agent-docs/skill-places.mjs';
+import {readProjectPlaces} from '../../foundation/agent-docs/skill-place-files.mjs';
 import {createRequire} from 'node:module';
 import {placeholderUses} from '../../foundation/discovery/template-icons.mjs';
 export {placeholderFixes} from '../../foundation/discovery/template-icons.mjs';
@@ -987,4 +990,20 @@ export async function fontPackagesInstallLine(projectDir, families) {
     line: packages.length ? installLine(projectDir, packages) : null,
     coversAll: known.every(Boolean),
   };
+}
+
+/**
+ * The project skill files that are there, absolute, when the project's
+ * astryx.config `skills.to` saves no `agents-md` place; empty otherwise.
+ * @param {string} cwd
+ * @returns {Promise<string[]>}
+ */
+export async function savedProjectSkillFiles(cwd) {
+  const root = resolveAgentDocsRoot(cwd);
+  if (root == null) return [];
+  const places = await readProjectPlaces(root);
+  if (places.some(place => place.kind === 'agents-md')) return [];
+  return places
+    .flatMap(place => placeSkillFiles(place, root))
+    .filter(file => fs.existsSync(file));
 }

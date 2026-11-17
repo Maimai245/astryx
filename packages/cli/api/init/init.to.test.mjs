@@ -479,6 +479,33 @@ describe('a project root in a settings folder of the home folder', () => {
   });
 });
 
+describe('a project that keeps its guidance as a skill', () => {
+  it('is set up once its skill files are current: init prints the build and search commands, not the setup steps', async () => {
+    const first = await run({to: 'skills'});
+    expect(first.agentDocsStatus).toBe('missing');
+    expect(first.nextSteps).toBe(true);
+    const again = await run({});
+    expect(again.agentDocsStatus).toBe('current');
+    expect(again.nextSteps).toBe(false);
+  });
+
+  it('checks the places before any feature writes: a linked-out skills folder stops the run first', async () => {
+    fs.mkdirSync(path.join(home, '.claude'));
+    fs.symlinkSync(path.join(home, '.claude'), path.join(project, '.claude'), 'dir');
+    const err = await refusal(() => run({to: 'skills', features: 'theme,agents'}));
+    expect(err.code).toBe(ERROR_CODES.ERR_PATH_TRAVERSAL);
+    expect(fs.readdirSync(project).sort()).toEqual(['.claude', '.git', 'package.json']);
+  });
+
+  it('keeps the skill places when the block it moves to fails to write', async () => {
+    await run({to: 'skills'});
+    fs.symlinkSync(path.join(home, 'elsewhere.md'), path.join(project, 'AGENTS.md'));
+    const data = await run({to: 'agents-md'});
+    expect(data.docsError?.kind).toBe('path-safety');
+    expect(exists(SHARED)).toBe(true);
+  });
+});
+
 describe('astryx init --to (CLI)', () => {
   it('writes the place and prints one line per file', async () => {
     const r = await runCli(['init', '--to', 'skills'], project);

@@ -42,7 +42,6 @@ import {
   placeSkillFiles,
   projectPlacesValue,
   renderProjectSkill,
-  savedProjectPlaces,
 } from '../../foundation/agent-docs/skill-places.mjs';
 import {
   keptReason,
@@ -54,15 +53,13 @@ import {
   computerSkillFolders,
   recordComputerSkillFolders,
 } from '../../foundation/env/user-settings.mjs';
-import {findConfigPath} from '../../foundation/config/project.mjs';
-import {loadModuleWithParser} from '../../foundation/fs/module-loader.mjs';
-import {parseConfig} from '../../authoring/config/parse.mjs';
 import {setConfigValues} from '../../foundation/config/config-writer.mjs';
 import {PathSafetyError, assertWithin} from '../../foundation/fs/path-safety.mjs';
 import {AstryxError} from '../error.mjs';
 import {ERROR_CODES} from '../../foundation/response/error-codes.mjs';
 
 export {COMPUTER_COMMAND, COMPUTER_INSTALL_STEP, displayHomePath};
+export {readProjectPlaces} from '../../foundation/agent-docs/skill-place-files.mjs';
 
 // What the run leaf reads before it writes agent docs: the state of the files
 // it is about to write.
@@ -121,28 +118,6 @@ export function skillProjectRoot(cwd) {
   return resolveAgentDocsRoot(cwd);
 }
 
-/**
- * The project places saved in the project's config. Only the config is
- * loaded, not its integrations. A config that cannot be loaded saves none,
- * so init writes the default as before, and the agent docs report the load
- * error.
- * @param {string} projectRoot
- * @returns {Promise<import('../../foundation/agent-docs/skill-places.mjs').SkillPlace[]>}
- */
-export async function readProjectPlaces(projectRoot) {
-  try {
-    const configPath = findConfigPath(projectRoot);
-    const config = configPath
-      ? await loadModuleWithParser(configPath, parseConfig, {
-          label: 'astryx.config',
-          fresh: true,
-        })
-      : undefined;
-    return savedProjectPlaces(config, projectRoot);
-  } catch {
-    return savedProjectPlaces(undefined, projectRoot);
-  }
-}
 
 /**
  * Save the project places in `skills.to` of the project's config: no key for

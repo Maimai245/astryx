@@ -127,6 +127,7 @@ import {
   isLocalThemeOwner,
   readThemeState,
   builtTargetOf,
+  savedProjectSkillFiles,
 } from './_adapter.mjs';
 import {checkBuilt} from './built-checks.mjs';
 import {coreOnlyDocNames} from '../../foundation/bases/core-docs.mjs';
@@ -163,6 +164,8 @@ import {
  * @property {string|null} [projectCore] - The Core release the project names
  *   (installed, else locked, else declared), as the daily hint reads it.
  * @property {string|null} configPath - Resolved astryx.config.mjs path, or null.
+ * @property {string[]} [projectSkillFiles] The project skill files that are
+ *   there, when astryx.config `skills.to` saves no `agents-md` place.
  * @property {import('../../foundation/integrations/integrations.mjs').LoadedIntegration[]|null} [integrations]
  *   Every integration the project loaded, or null when the project could not be
  *   read at all.
@@ -870,6 +873,17 @@ export function checkAgentDocs(ctx) {
       ? `${refusal} Move the project into a folder of its own, or edit the Astryx block in its agent file by hand.`
       : initFix;
 
+  // A project that keeps its Astryx guidance as a skill (astryx.config
+  // `skills.to` without `agents-md`) has no agent file to find.
+  const skillFiles = ctx.projectSkillFiles ?? [];
+  if (present.length === 0 && skillFiles.length > 0) {
+    return {
+      id: 'agent-docs',
+      label: 'AI agent docs',
+      status: 'pass',
+      message: `Astryx skill present in ${skillFiles.map(shown).join(', ')} (astryx.config skills.to).`,
+    };
+  }
   if (present.length === 0) {
     return {
       id: 'agent-docs',
@@ -2622,6 +2636,7 @@ export async function runChecks(options = {}) {
     cwd,
     nodeVersion: process.versions.node,
     coreDir,
+    projectSkillFiles: await savedProjectSkillFiles(cwd),
     ownCli: projectHasOwnCli(cwd),
     projectCore: projectCoreVersion(cwd),
     addedThemePackages: addedThemePackages(cwd),
