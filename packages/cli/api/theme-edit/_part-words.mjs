@@ -136,13 +136,12 @@ export const OVERRIDES = [
   ],
   [/\b((table )?cells?)\b/, {on: 'table-cell'}],
   [/\b(table rows?|rows?|tables?)\b/, {on: 'table-row'}],
-  // (A keyboard key, "the key chips", is one of Kbd's key badges, never a
-  // Badge; a keyboard shortcut is the whole Kbd.)
+  // (A keyboard key or shortcut, "the key chips", "the kbd", is painted by
+  // Kbd's key badges, never a Badge: the group around them paints nothing.)
   [
-    /\b(keyboard (keys?|chips?)|key ?(chips?|caps?)|shortcut keys?)\b/,
+    /\b(kbds?|keyboard (keys?|shortcuts?|chips?)|key ?(chips?|caps?)|shortcut keys?)\b/,
     {on: 'kbd-key'},
   ],
-  [/\b(kbds?|keyboard shortcuts?)\b/, {on: 'kbd'}],
   [/\b(badges?|chips?|tags?)\b/, {on: 'badge'}],
   [/\bh([1-6])\b/, {on: 'heading'}],
   [/\b(headings?|titles?)\b/, {on: 'heading'}],

@@ -1,10 +1,11 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 
 /**
- * A paint an element inside a part draws from a token (a keyboard key's
- * chip, a list item's label text): set never takes the property on the
- * part, which that element paints over, and offers the token. Against real
- * bundled base themes.
+ * A paint an element inside a part draws from a token (a list item's label
+ * text): set never takes the property on the part, which that element
+ * paints over, and offers the token. A paint drawn by a part of its own (a
+ * keyboard key's badge, a calendar's range band) is no such paint: a fill on
+ * the group around it is taken. Against real bundled base themes.
  */
 
 import {afterAll, beforeAll, describe, expect, it, vi} from 'vitest';
@@ -60,13 +61,15 @@ const answer = async (q, theme) => {
 };
 
 describe('a paint drawn inside a part', () => {
-  it('refuses the property on the part and offers the token', async ctx => {
+  it('refuses the property on the part and offers the token, and takes a fill on a group whose inner paints are parts of their own', async ctx => {
     if (needBases(ctx)) return;
     await themeEditNew('i', {cwd, like: 'neutral'});
     // Kbd's key badges paint each key's fill as a part of their own,
-    // kbd-key, which takes the property; a fill on the whole shortcut, and
-    // on a part whose inner parts paint their own (a paragraph's code), is
-    // the base's, and is taken too.
+    // kbd-key, which takes the property. Now that the badges, and a
+    // calendar's range band, are parts of their own, a fill on the group
+    // around them (kbd, calendar) is no longer painted over, so it is taken
+    // and paints the group's own box; so is one on a part whose inner parts
+    // paint their own (a paragraph's code).
     await themeEditSet('i', 'background-color', '#888888', {
       cwd,
       on: 'kbd-key',
@@ -75,6 +78,10 @@ describe('a paint drawn inside a part', () => {
     await themeEditSet('i', 'background-color', '#f5f5f5', {
       cwd,
       on: 'markdown-paragraph',
+    });
+    await themeEditSet('i', 'background-color', '#fafafa', {
+      cwd,
+      on: 'calendar',
     });
     const item = await refusal(() =>
       themeEditSet('i', 'color', '#ff0000', {cwd, on: 'radio-list-item'}),
@@ -85,10 +92,17 @@ describe('a paint drawn inside a part', () => {
     );
     // (A part that paints its own fill keeps the property.)
     await themeEditSet('i', 'background-color', '#888888', {cwd, on: 'card'});
-    // The words for a keyboard key read Kbd's key badge, which paints it.
-    const keys = await answer('make the keyboard keys gray', 'i');
-    expect(keys.parts).toContain('kbd-key');
-    expect(keys.writes.join('\n')).toMatch(/ --on kbd-key\b/);
+    // The words for a keyboard key or shortcut read Kbd's key badges, which
+    // paint every key.
+    for (const q of [
+      'make the keyboard keys gray',
+      'make the keyboard shortcut gray',
+      'make the kbd gray',
+    ]) {
+      const keys = await answer(q, 'i');
+      expect(keys.parts, q).toContain('kbd-key');
+      expect(keys.writes.join('\n'), q).toMatch(/ --on kbd-key\b/);
+    }
     const text = await answer('make the radio list item text red', 'i');
     expect(text.writes.join('\n')).not.toMatch(
       / color '#dc2626' --on radio-list-item/,
