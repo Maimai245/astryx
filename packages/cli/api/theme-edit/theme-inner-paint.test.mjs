@@ -104,7 +104,7 @@ describe('a paint drawn inside a part', () => {
       expect(keys.writes.join('\n'), q).toMatch(/ --on kbd-key\b/);
     }
     // The space between the keys is the gap of the shortcut that lays them
-    // out: written on kbd, never as padding on each key.
+    // out: its words read kbd, never padding on each key.
     for (const q of [
       'make the gap in the keyboard shortcut bigger',
       'put more space between the keyboard keys',
@@ -112,12 +112,14 @@ describe('a paint drawn inside a part', () => {
       const gap = await answer(q, 'i');
       expect(gap.writes[0], q).toMatch(/ --on kbd$/);
     }
-    // Only a part of the keys' own component holds their gap: the space
-    // between avatars or dividers is never written on a part of another
-    // component that holds them (a chat message, a context menu).
+    // The gap is Kbd's for the shortcut's keys alone: the space between
+    // other parts is never written on a part that holds them (a chat
+    // message, a context menu, a step, a slider).
     for (const [q, other] of [
       ['more space between the avatars', 'chat-message'],
       ['more space between the dividers', 'context-menu'],
+      ['more space between the step labels', 'step'],
+      ['more space between the slider thumb and the track', 'slider'],
     ]) {
       const gap = await answer(q, 'i');
       expect(gap.writes.join('\n'), q).not.toMatch(

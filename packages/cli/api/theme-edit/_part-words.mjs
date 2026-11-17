@@ -136,6 +136,12 @@ export const OVERRIDES = [
   ],
   [/\b((table )?cells?)\b/, {on: 'table-cell'}],
   [/\b(table rows?|rows?|tables?)\b/, {on: 'table-row'}],
+  // (The space between a shortcut's keys is the gap of Kbd, which lays the
+  // keys out.)
+  [
+    /\b(?:gaps?|space|spacing|room)\s+(?:between|in)\s+(?:the\s+)?(?:keyboard (?:keys?|shortcuts?|chips?)|kbds?|key ?(?:chips?|caps?)|shortcut keys?)\b/,
+    {on: 'kbd'},
+  ],
   // (A keyboard key or shortcut, "the key chips", "the kbd", is painted by
   // Kbd's key badges, never a Badge: the group around them paints nothing.)
   [

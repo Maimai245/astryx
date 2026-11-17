@@ -14719,35 +14719,6 @@ export function draftAnswer(ctx, env, question) {
     const where = on
       ? ` on ${on}${f.when ? ` (${f.when.replace(':', ' ')})` : ''}${f.state ? ` when ${f.state}` : ''}`
       : ' for the whole theme';
-    // The gap between parts (the space between a shortcut's keys) is the
-    // gap of the one nearest part of the same component that lays them out,
-    // when the part named has no gap of its own: the answer is on that part.
-    if (
-      on &&
-      !FAMILIES[on] &&
-      a === 'spacing' &&
-      /\b(gaps?|between)\b/.test(c.text) &&
-      !C.MAP[one(on)]?.own?.gap
-    ) {
-      // (Only a part of the named part's own component: the keys' Kbd, never
-      // a chat message holding an avatar or a menu holding a divider.)
-      const comp = ctx.project.target.get(one(on))?.component;
-      const holders = Object.keys(C.MAP).filter(
-        k =>
-          k !== one(on) &&
-          comp != null &&
-          ctx.project.target.get(k)?.component === comp &&
-          (C.MAP[k].contains ?? []).includes(one(on)) &&
-          C.MAP[k].own?.gap,
-      );
-      // (The part data lists every part inside a part, at any depth: the
-      // nearest holder is the one that holds no other holder.)
-      const nearest = holders.filter(
-        h =>
-          !holders.some(x => x !== h && (C.MAP[h].contains ?? []).includes(x)),
-      );
-      if (nearest.length === 1) return answerFor(c, {...p, on: nearest[0]}, a);
-    }
     // A part drawn inside an overlay that paints its edge for it (a
     // typeahead's list, inside the popover it opens in): the shadow or the
     // border is the overlay's, so the answer points there, saying that a
