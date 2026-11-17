@@ -161,10 +161,11 @@
  *   display name and description, and it carries `license`, `iconCount`, `default` (the variant
  *   an icon's own export draws, when the set names one), the shared icon names
  *   its `map` covers (`definitions`), and `command`, which searches the set's icons. A source's
- *   entry carries `iconCount` and `definitions` when the source lists them.
- *   The icon-set fields (`license`, `iconCount`, `default`, `definitions`,
- *   and `command`) are experimental: they may change or be removed in a patch
- *   release.
+ *   entry carries `license` and `iconCount` when the source lists them; its
+ *   `definitions` are listed only in a project that sets
+ *   `experimental.iconSet`. The icon-set fields (`license`, `iconCount`,
+ *   `default`, `definitions`, and `command`) are experimental: they may
+ *   change or be removed in a patch release.
  */
 
 /**

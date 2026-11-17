@@ -39,6 +39,7 @@ import {
   projectTree,
 } from '../docs/_adapter.mjs';
 import {discoverIntegrationIconSets} from '../../foundation/discovery/icon-set-discovery.mjs';
+import {astryxDefinitionsByName} from '../../foundation/discovery/icon-definition-discovery.mjs';
 import {isValidSemver, semverCompare} from '../../foundation/env/semver.mjs';
 import {assertWithin} from '../../foundation/fs/path-safety.mjs';
 import {userCacheDir} from '../../foundation/env/user-dirs.mjs';
@@ -643,16 +644,34 @@ function savedCopyPath(cacheDir, from, request) {
 }
 
 /**
+ * A source's catalog with its icon sets, which discover lists in every
+ * project (spec:AST-084 FR17). Without the opt-in, a malformed icon-set item
+ * never fails a source: the catalog is then read as a CLI without icon sets
+ * reads it, with the kind and its fields unknown (spec:AST-051 FR7).
+ * @param {unknown} value
+ * @param {string} label
+ * @param {boolean} optedIn the project opts into icon sets
+ */
+function parseCatalog(value, label, optedIn) {
+  if (optedIn) return parseDiscoverCatalog(value, label, {iconSets: true});
+  try {
+    return parseDiscoverCatalog(value, label, {iconSets: true});
+  } catch {
+    return parseDiscoverCatalog(value, label);
+  }
+}
+
+/**
  * @param {string} file
  * @param {string} label
- * @param {boolean} iconSets the project opts into icon sets
+ * @param {boolean} optedIn the project opts into icon sets
  */
-function readSavedCopy(file, label, iconSets) {
+function readSavedCopy(file, label, optedIn) {
   try {
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     return {
       savedAt: String(saved.savedAt),
-      catalog: parseDiscoverCatalog(saved.catalog, label, {iconSets}),
+      catalog: parseCatalog(saved.catalog, label, optedIn),
     };
   } catch {
     return null;
@@ -682,9 +701,9 @@ function writeSavedCopy(file, catalog) {
  * @param {{package?: string, version?: string}} request
  * @param {string} label
  * @param {number} timeoutMs
- * @param {boolean} iconSets the project opts into icon sets
+ * @param {boolean} optedIn the project opts into icon sets
  */
-async function callSource(source, request, label, timeoutMs, iconSets) {
+async function callSource(source, request, label, timeoutMs, optedIn) {
   const controller = new AbortController();
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let timer;
@@ -703,7 +722,7 @@ async function callSource(source, request, label, timeoutMs, iconSets) {
       ),
       timedOut,
     ]);
-    return parseDiscoverCatalog(answer, label, {iconSets});
+    return parseCatalog(answer, label, optedIn);
   } finally {
     clearTimeout(timer);
   }
@@ -728,9 +747,7 @@ async function callOwnSources(project, request = {}, options = {}) {
   const result = {sources: [], packages: []};
   const fromDoor = doorSources();
   if (project == null && fromDoor.length === 0) return result;
-  // Without the opt-in, icon-set items and fields are unknown before the
-  // catalog is checked, so one cannot fail a source (spec:AST-051 FR7).
-  const iconSets = optedIntoIconSets(project);
+  const optedIn = optedIntoIconSets(project);
 
   /** @type {Array<{from: string, key?: string, source?: DiscoverSource, error?: string}>} */
   const origins = [];
@@ -780,7 +797,7 @@ async function callOwnSources(project, request = {}, options = {}) {
     /** @type {import('../../authoring/discover/type').DiscoverCatalog} */
     let catalog;
     try {
-      catalog = await callSource(source, ask, label, timeoutMs, iconSets);
+      catalog = await callSource(source, ask, label, timeoutMs, optedIn);
       writeSavedCopy(file, catalog);
       result.sources.push({
         name: catalog.source.name,
@@ -791,7 +808,7 @@ async function callOwnSources(project, request = {}, options = {}) {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      const saved = readSavedCopy(file, label, iconSets);
+      const saved = readSavedCopy(file, label, optedIn);
       if (saved == null) {
         result.sources.push({
           name: from,
@@ -869,9 +886,9 @@ export async function callSources(project, request = {}, options = {}) {
     ],
     // Source order: the first entry per integration is the one discover
     // keeps. Official packages are put first only where discover shows them.
-    // An experimental kind is a kind this project does not read unless it
-    // opts in, so its items are ignored like any unknown kind (FR7).
-    packages: withoutUnreadKinds(project, [...own.packages, ...added]),
+    // Icon sets a project could add are listed in every project, so an app
+    // can compare them before it picks one (spec:AST-084 FR17).
+    packages: [...own.packages, ...added],
   };
 }
 
@@ -888,7 +905,7 @@ export const STABLE_KINDS = DISCOVER_KINDS.filter(
 );
 
 /**
- * The item kinds discover reads in the project at the working directory, or
+ * The item kinds `--type` takes in the project at the working directory, or
  * the stable kinds when it cannot be read.
  * @returns {Promise<readonly string[]>}
  */
@@ -897,7 +914,7 @@ export async function loadReadKinds() {
 }
 
 /**
- * The item kinds discover reads in this project: every stable kind, and the
+ * The item kinds `--type` takes in this project: every stable kind, and the
  * experimental ones when the project opts in.
  * @param {Project | undefined} project
  * @returns {readonly string[]}
@@ -912,21 +929,6 @@ export function readKinds(project) {
  */
 export function optedIntoIconSets(project) {
   return Boolean(project?.config?.experimental?.iconSet);
-}
-
-/**
- * @template {{contributions: Array<{kind: string}>}} P
- * @param {Project | undefined} project
- * @param {P[]} packages
- * @returns {P[]}
- */
-function withoutUnreadKinds(project, packages) {
-  if (optedIntoIconSets(project)) return packages;
-  const kinds = readKinds(project);
-  return packages.map(pkg => ({
-    ...pkg,
-    contributions: pkg.contributions.filter(c => kinds.includes(c.kind)),
-  }));
 }
 
 /**
@@ -1211,4 +1213,13 @@ export async function loadValidatedDoc(result, {lang, zh}) {
       ERROR_CODES.ERR_INVALID_DOC,
     );
   return docs;
+}
+
+/**
+ * The names of the icon definitions this CLI ships: the meanings an icon set
+ * can map.
+ * @returns {Set<string>}
+ */
+export function iconMeaningNames() {
+  return new Set(astryxDefinitionsByName().keys());
 }

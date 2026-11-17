@@ -26,11 +26,15 @@ import {defaultVersion} from '../../_catalog-view.mjs';
  *   version?: string,
  *   add?: (name: string, version?: string) => string,
  *   installedAs?: string,
- * }} [options]
+ *   iconSets?: boolean,
+ *   meaningNames?: () => Set<string>,
+ * }} [options] `iconSets`: the project opts into icon sets, so a set's
+ *   `definitions` are shown. `meaningNames` gives the icon definitions this
+ *   CLI ships, which a set's coverage (iconSetMeanings) counts.
  * @returns {import('../../discover.type.mjs').DiscoverItemResponse | null}
  */
 export function item(packages, packageName, itemName, options = {}) {
-  const {catalog, version, add, installedAs} = options;
+  const {catalog, version, add, installedAs, iconSets, meaningNames} = options;
   const pkg = packages.find(p => p.name === packageName);
   if (pkg && (!version || version === pkg.version)) {
     for (const [kind, field] of KIND_FIELDS) {
@@ -87,7 +91,8 @@ export function item(packages, packageName, itemName, options = {}) {
     catalog?.contributions.find(c => c.name.toLowerCase() === lower);
   if (!catalog || !found) return null;
   const shown = version ?? defaultVersion(catalog);
-  return {
+  /** @type {import('../../discover.type.mjs').DiscoverItemResponse} */
+  const response = {
     type: 'discover.item',
     package: packageName,
     data: {
@@ -98,8 +103,11 @@ export function item(packages, packageName, itemName, options = {}) {
       ...(found.title ? {title: found.title} : {}),
       ...(found.summary ? {summary: found.summary} : {}),
       ...(found.keywords ? {keywords: found.keywords} : {}),
+      ...(found.license ? {license: found.license} : {}),
       ...(found.iconCount != null ? {iconCount: found.iconCount} : {}),
-      ...(found.definitions ? {definitions: found.definitions} : {}),
+      ...(found.definitions && iconSets
+        ? {definitions: found.definitions}
+        : {}),
       ...(found.kind === 'icon-set' && pkg != null
         ? {
             command: `astryx experimental icon <words> --set ${packageName}/${found.name}`,
@@ -112,5 +120,42 @@ export function item(packages, packageName, itemName, options = {}) {
         : {}),
       source: catalog.source,
     },
+  };
+  if (found.definitions && meaningNames) {
+    meaningsOf.set(
+      response,
+      meaningsCovered(found.definitions, meaningNames()),
+    );
+  }
+  return response;
+}
+
+/**
+ * How many of this CLI's icon definitions an icon set a source lists maps, by
+ * item response. The text view prints it; it never enters discover's JSON.
+ * @type {WeakMap<object, {mapped: number, total: number}>}
+ */
+const meaningsOf = new WeakMap();
+
+/**
+ * How many of this CLI's icon definitions the icon set an item response
+ * shows maps, of how many; null when its source lists no definitions.
+ * @param {object} response
+ * @returns {{mapped: number, total: number} | null}
+ */
+export function iconSetMeanings(response) {
+  return meaningsOf.get(response) ?? null;
+}
+
+/**
+ * How many of this CLI's icon definitions a set maps, of how many there are.
+ * @param {string[]} definitions the definitions the set's map covers
+ * @param {Set<string>} names the definitions this CLI ships
+ * @returns {{mapped: number, total: number}}
+ */
+function meaningsCovered(definitions, names) {
+  return {
+    mapped: new Set(definitions.filter(name => names.has(name))).size,
+    total: names.size,
   };
 }

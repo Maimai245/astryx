@@ -152,7 +152,7 @@ const ICON_SET_READERS = {
   'api/upgrade/run/run.mjs':
     'passes the opt-in to the nudge, which strips the root without it',
   'api/discover/_adapter.mjs':
-    'reads sets only with the opt-in, and strips the root before collecting identities',
+    'reads installed sets only with the opt-in, and strips the root before collecting identities',
   // Readers behind a gated reader.
   'api/docs/_entry-names.mjs':
     "whether a loaded integration names a root, so the docs tree may hold more than the CLI's own; it reads the sets only through project.iconSets()",
@@ -185,6 +185,8 @@ const ICON_SET_READERS = {
     'integration verify, for the package being authored',
   'clients/cli/commands/doctor.mjs':
     "prints validate's iconSets, which validate fills only with its gate",
+  'clients/cli/commands/discover.mjs':
+    "prints the Available entries' iconSets, which come from a source's catalog, never an installed root",
 };
 /** A read of an icon-set root, or a run of icon-set discovery or checks. */
 const ICON_SET_READ =

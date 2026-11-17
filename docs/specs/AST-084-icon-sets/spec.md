@@ -76,7 +76,8 @@ icon, and the CLI verifies it, writes the files, and checks the set.
   - the commands are `astryx experimental icon` and its subcommands, under the
     `experimental` command group; no stable command gains an icon-set
     subcommand or option value, and the one icon-set kind on a stable command
-    is discover's `icon-set`, read only with the opt-in (FR17, DEC-8);
+    is discover's `icon-set`: a set a project could add is listed in every
+    project, and the rest is read only with the opt-in (FR17, DEC-8);
   - `astryx experimental` is a top-level command group admitted here under
     `spec:AST-042/FR4`. It answers one question: where does a CLI control live
     while it may still change in a patch release? No existing command can hold
@@ -129,10 +130,10 @@ icon, and the CLI verifies it, writes the files, and checks the set.
   judge, and its not-checked count is higher by that number; a CLI without
   this feature has neither. The note and the list fail nothing under
   `--strict`.
-  Discover refuses
-  `--type icon-set` and ignores `icon-set` catalog items and their fields
-  exactly as it does any unknown kind or field. With the opt-in, `icon-set`
-  is a discover kind (FR17). `astryx search` never reads icon sets, with or
+  The one exception is discover's list of icon sets a project could add
+  (FR17): a catalog that lists no `icon-set` item gives the output it gives
+  without this feature. Discover refuses `--type icon-set`. With the opt-in,
+  `icon-set` is a discover kind (FR17). `astryx search` never reads icon sets, with or
   without the opt-in, and returns no experimental doc. No stable doc names an
   experimental route, an icon set, or an icon definition, and a stable docs
   node's previous and next links skip experimental neighbors; the one stable
@@ -619,7 +620,7 @@ message}`) names each template or namespace doc that sets `stability`, and
   the key (FR17). `exclude` is read only by a CLI whose data-file reference
   lists it, and `new-set` writes it only when `--exclude` is given; a set
   without it is read by every CLI that has `astryx experimental icon`.
-- **FR17 — Doctor and discover read sets only with the opt-in.** In a project
+- **FR17 — Doctor and discover read installed sets only with the opt-in.** In a project
   that sets `experimental.iconSet`, each set the list names is one of: valid
   (`selected`), not installed (`missing`), shipped by two packages under that
   name (`ambiguous`), or installed but withdrawn (`withdrawn`: invalid, or
@@ -645,12 +646,22 @@ message}`) names each template or namespace doc that sets `stability`, and
   a kind: `--type icon-set`, catalog entries with `iconCount` and
   `definitions`, and `discover <package>/<set>`; a withdrawn set is not
   listed. Without the opt-in, Doctor has no such check and reports no icon-set
-  issue and no placeholder check, `doctor integration` checks an installed package's icon sets only
+  issue and no placeholder check, and `doctor integration` checks an installed package's icon sets only
   with it (the package being authored, read by `doctor integration validate`
-  with no package, `integration check`, and `verify`, is always checked), and
-  discover treats `icon-set` as an unknown kind and `iconCount` and
-  `definitions` as unknown fields before it validates a catalog, so a
-  malformed icon-set item never fails a source (`spec:AST-051/FR7`).
+  with no package, `integration check`, and `verify`, is always checked).
+  Discover lists the icon sets a project could add in every project, so an
+  app can compare them before it picks one: a catalog package's `icon-set`
+  items show in its Available entry's `iconSets`, in a search, and on the
+  item page, whose text comes from the catalog entry (`title`, `summary`,
+  `license`, `iconCount`). When the entry lists `definitions`, the page's
+  text says how many of the icon definitions the CLI ships the set maps, of
+  how many (`meanings: N of M`); its JSON carries no such field. The page for a set the project does not have gives the
+  project's install command and then `astryx experimental icon use <set>`.
+  Without the opt-in, discover lists no installed set, refuses
+  `--type icon-set`, and shows no set's `definitions`.
+  Without it, a catalog whose icon-set items do not validate is read with
+  the kind and its fields unknown, so a malformed icon-set item never fails
+  a source (`spec:AST-051/FR7`).
 
 ### Placeholder and previews
 
@@ -803,11 +814,13 @@ one vocabulary across as many namespaces as there are sets.
 **Decider:** `josephfarina`, `2026-10-20`
 
 A set is an item a package adds, so discover lists it like the six kinds of
-`spec:AST-051/FR5`, with the additive catalog fields `iconCount` and
-`definitions`. Only a project that sets `experimental.iconSet` reads them.
-Without it, `--type icon-set` fails with `ERR_INVALID_OPTION`, unknown-kind
-errors list the six kinds, and the kind and its fields are unknown under
-`spec:AST-051/FR7`, so the output matches a CLI without icon sets.
+`spec:AST-051/FR5`, with the additive catalog fields `iconCount`, `license`
+and `definitions`. A set a project could add is listed in every project, so
+an app can choose a pack before it opts in. Everything else stays behind
+`experimental.iconSet`: without it, installed sets are not listed, `--type
+icon-set` fails with `ERR_INVALID_OPTION`, unknown-kind errors list the six
+kinds, and no set's `definitions` are shown. A catalog that lists no icon set
+gives the output of a CLI without icon sets.
 
 ### DEC-9 — `olderCliNotes` is additive and never fails
 

@@ -30,6 +30,7 @@ import {cliError, rejectEmptyArgument} from '../lib/cli-error.mjs';
 import {
   answersQueries,
   discover as discoverApi,
+  iconSetMeanings,
   OFFICIAL_SOURCE_NAME,
 } from '../../../api/discover/discover.mjs';
 import {isValidSemver} from '../../../foundation/env/semver.mjs';
@@ -170,6 +171,28 @@ function withDocSections(entry, run) {
 }
 
 /**
+ * An icon set's item page as the text view shows it: after its icon count,
+ * how many of the CLI's icon definitions it maps, of how many. The JSON
+ * carries no such field.
+ * @template {object} T
+ * @param {T} data
+ * @param {{mapped: number, total: number} | null} meanings
+ * @returns {T | Record<string, unknown>}
+ */
+function withIconSetMeanings(data, meanings) {
+  if (!meanings) return data;
+  /** @type {Record<string, unknown>} */
+  const shown = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key === 'installed') {
+      shown.meanings = `${meanings.mapped} of ${meanings.total}`;
+    }
+    shown[key] = value;
+  }
+  return shown;
+}
+
+/**
  * Record options that summarize each item list to its first names.
  * @param {boolean} full print every name instead
  * @returns {import('../formatters/index.mjs').RecordOptions}
@@ -285,12 +308,22 @@ function pinNote(install, shown, source) {
  * @param {string} run how to invoke the CLI
  * @param {string} [note] what the command installs, when the page shows
  *   another version
+ * @param {string[]} [iconSets] icon set names the item adds; once the package
+ *   is installed, `experimental icon use` picks one
  * @returns {import('../formatters/index.mjs').Block[]}
  */
-function addBlocks(install, themes, addsOther, run, note) {
+function addBlocks(install, themes, addsOther, run, note, iconSets = []) {
   /** @type {import('../formatters/index.mjs').Block[]} */
   const blocks = [section('Add it'), code(install)];
   if (note) blocks.push(text(note));
+  if (iconSets.length > 0) {
+    blocks.push(
+      text('Then use its icon set:'),
+      code(
+        iconSets.map(set => `${run} experimental icon use ${set}`).join('\n'),
+      ),
+    );
+  }
   if (themes.length > 0) {
     blocks.push(
       text(
@@ -429,6 +462,16 @@ export function registerDiscover(program) {
                           : 'Nothing new to add: this project has every integration its sources list.',
                     ),
               );
+              const iconSets = available.flatMap(entry =>
+                Array.isArray(entry.iconSets) ? entry.iconSets : [],
+              );
+              if (iconSets.length > 0) {
+                blocks.push(
+                  text(
+                    `Then use an icon set it adds: ${run} experimental icon use <set>, for example ${run} experimental icon use ${iconSets[0]}`,
+                  ),
+                );
+              }
             }
             blocks.push(...sourceNotes(sources));
             if (!queries) {
@@ -554,7 +597,9 @@ export function registerDiscover(program) {
           case 'discover.item': {
             const d = result.data;
             emit(
-              record(d, {omit: ['install']}),
+              record(withIconSetMeanings(d, iconSetMeanings(result)), {
+                omit: ['install'],
+              }),
               // A doc that adds sections to another package's topic says how
               // to read each one.
               ...(d.kind === 'doc' && d.sections
@@ -573,6 +618,7 @@ export function registerDiscover(program) {
                     d.kind !== 'theme',
                     run,
                     pinNote(d.install, d.version, d.source),
+                    d.kind === 'icon-set' ? [d.name] : [],
                   )
                 : []),
               text(`Its package: ${run} discover ${d.package}`),

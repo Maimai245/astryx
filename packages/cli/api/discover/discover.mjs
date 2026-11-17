@@ -33,7 +33,9 @@ import {
   discoverPackages,
   findComponent,
   hasSources,
+  iconMeaningNames,
   loadReadKinds,
+  optedIntoIconSets,
   officialDeclarations,
   STABLE_KINDS,
   officialFirst,
@@ -50,6 +52,7 @@ import {list} from './list/list.mjs';
 import {detail} from './detail/detail.mjs';
 import {doc, docFromResult} from './detail/doc/doc.mjs';
 import {item} from './detail/item/item.mjs';
+export {iconSetMeanings} from './detail/item/item.mjs';
 import {search} from './search/search.mjs';
 import {AstryxError} from '../error.mjs';
 import {ERROR_CODES} from '../../foundation/response/error-codes.mjs';
@@ -319,6 +322,8 @@ export async function discover(query, options = {}) {
       // Only an entry the official list supplied gets a pinned version.
       add: entry?.official ? addOfficial : add,
       installedAs,
+      iconSets: optedIntoIconSets(project),
+      meaningNames: iconMeaningNames,
     };
     if (!target.item) return detail(packages, target.name, context);
     const found = item(packages, target.name, target.item, context);

@@ -32,7 +32,7 @@ export const docs = {
       content: [
         {
           type: 'prose',
-          text: 'Icon sets are experimental: the `astryx experimental icon` commands, the `experimental.iconSet` key in astryx.config, the `experimental.iconSets` key in an integration manifest, the data file, icon definitions, and the output and JSON of all of them can change, or go away, in any patch release without a deprecation period. A project that does not set `experimental.iconSet` sees no change in any stable command, apart from: the marked `experimental` group in help and in `astryx manifest` (its command, and its `responseTypes` and `jsonSupported` entries); the marked experimental entries in the CLI reference listings; and a search for \"experimental\", which also finds the stable `stability` field of the field reference. Templates, discover, and doctor answer as they do with no icon set installed. With a package that ships icon sets installed and no opt-in, the warnings an older CLI gives about the manifest key `experimental` (in `astryx doctor` and `astryx doctor integration validate <package>`, and the one-line nudge other commands print to stderr) are gone. `astryx search` never returns icons or these docs; to find an icon by meaning, use `astryx experimental icon <words>`.',
+          text: 'Icon sets are experimental: the `astryx experimental icon` commands, the `experimental.iconSet` key in astryx.config, the `experimental.iconSets` key in an integration manifest, the data file, icon definitions, and the output and JSON of all of them can change, or go away, in any patch release without a deprecation period. A project that does not set `experimental.iconSet` sees no change in any stable command, apart from: the marked `experimental` group in help and in `astryx manifest` (its command, and its `responseTypes` and `jsonSupported` entries); the marked experimental entries in the CLI reference listings; and a search for \"experimental\", which also finds the stable `stability` field of the field reference; and `astryx discover`, which lists the icon sets your sources offer that you could add, so you can compare them before you pick one. Templates and doctor answer as they do with no icon set installed, and discover lists no installed set. With a package that ships icon sets installed and no opt-in, the warnings an older CLI gives about the manifest key `experimental` (in `astryx doctor` and `astryx doctor integration validate <package>`, and the one-line nudge other commands print to stderr) are gone. `astryx search` never returns icons or these docs; to find an icon by meaning, use `astryx experimental icon <words>`.',
         },
       ],
     },
@@ -522,7 +522,7 @@ export const brand = defineTheme({name: 'brand', icons: themeIconsFilled});`,
           rows: [
             [
               '`experimental.iconSet` in astryx.config',
-              "The project's main icon set, by set name or as `<package>/<set>`, or a list: the main set first, then backup sets in order. It is the opt-in: templates, discover, and doctor read icon sets only when it is set. `astryx experimental icon` ranks the main set's icons first, and without it treats the only installed set as the project's. `astryx experimental icon use <main> --backup <set>` writes it.",
+              "The project's main icon set, by set name or as `<package>/<set>`, or a list: the main set first, then backup sets in order. It is the opt-in: templates, doctor, and discover's installed sets, `--type icon-set`, and set definitions read icon sets only when it is set. `astryx experimental icon` ranks the main set's icons first, and without it treats the only installed set as the project's. `astryx experimental icon use <main> --backup <set>` writes it.",
             ],
             [
               '`experimental.iconVariant` in astryx.config',
@@ -538,7 +538,7 @@ export const brand = defineTheme({name: 'brand', icons: themeIconsFilled});`,
             ],
             [
               '`astryx discover`',
-              "A package's sets (`iconSets`) and, for `@scope/name/<set>`, the set's display name, license, icon count, and definitions; `--type icon-set` keeps only sets.",
+              "A package's sets (`iconSets`) and, for `@scope/name/<set>`, the set's display name, license, icon count, and definitions. A set your sources offer is listed without the opt-in too; its page says how many of the CLI's icon definitions it maps, of how many (`meanings: N of M`, in the text view), when the source lists its definitions, and gives the command that installs its package, and `astryx experimental icon use <set>` to pick it; its definitions and `--type icon-set` need the opt-in.",
             ],
             [
               '`astryx doctor`',

@@ -33,6 +33,7 @@ const contributionSchema = z.object({
   summary: z.string().max(4096).optional(),
   keywords: z.array(z.string().max(128)).max(64).optional(),
   iconCount: z.number().int().min(0).optional(),
+  license: z.string().max(256).optional(),
   definitions: z.array(z.string().max(128)).max(2048).optional(),
 });
 
@@ -78,7 +79,11 @@ function newestFirst(a, b) {
 }
 
 /** Item fields read only for the experimental `icon-set` kind. */
-const ICON_SET_FIELDS = /** @type {const} */ (['iconCount', 'definitions']);
+const ICON_SET_FIELDS = /** @type {const} */ ([
+  'iconCount',
+  'license',
+  'definitions',
+]);
 
 /**
  * The catalog with every icon-set-only field taken off its items, so a project
@@ -117,7 +122,7 @@ function withoutIconSetFields(value) {
  * put newest first whatever order the source used.
  *
  * The experimental `icon-set` kind and its item fields (`iconCount`,
- * `definitions`) are read only with `iconSets` (spec:AST-084). Without it they
+ * `license`, `definitions`) are read only with `iconSets` (spec:AST-084). Without it they
  * are unknown: the fields are taken off before the check and the items are
  * dropped after it, exactly as for any kind or field this CLI does not know
  * (spec:AST-051 FR7).
