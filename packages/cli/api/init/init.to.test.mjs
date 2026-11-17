@@ -386,6 +386,37 @@ describe('refusals', () => {
   });
 });
 
+describe('refusals that keep every file where it is', () => {
+  it('refuses a project skills folder linked out of the project, before the config or any file changes', async () => {
+    await run({});
+    fs.mkdirSync(path.join(home, '.claude'));
+    fs.symlinkSync(path.join(home, '.claude'), path.join(project, '.claude'), 'dir');
+    const err = await refusal(() => run({to: 'skills'}));
+    expect(err.code).toBe(ERROR_CODES.ERR_PATH_TRAVERSAL);
+    expect(fs.existsSync(path.join(home, '.claude', 'skills'))).toBe(false);
+    expect(exists('astryx.config.mjs')).toBe(false);
+    expect(exists('AGENTS.md')).toBe(true);
+    expect(exists('.agents')).toBe(false);
+  });
+
+  it.each([
+    [{to: 'user', all: true}, '--all'],
+    [{to: 'user', features: 'agents'}, '--features'],
+    [{to: 'user', agent: 'claude'}, '--agent'],
+  ])('refuses %o as --user does', async (options, named) => {
+    const err = await refusal(() => init(options, {cwd: project}));
+    expect(err.code).toBe(ERROR_CODES.ERR_INVALID_ARGUMENT);
+    expect(err.message).toContain(`\`--to user\` cannot be combined with ${named}`);
+  });
+
+  it('names an unknown feature with the same code as without --to', async () => {
+    const err = await refusal(() => init({to: 'skills', features: 'bogus'}, {cwd: project}));
+    expect(err.code).toBe(ERROR_CODES.ERR_UNKNOWN_FEATURE);
+    const both = await refusal(() => init({to: 'skills', features: 'agents', all: true}, {cwd: project}));
+    expect(both.code).toBe(ERROR_CODES.ERR_INVALID_ARGUMENT);
+  });
+});
+
 describe('astryx init --to (CLI)', () => {
   it('writes the place and prints one line per file', async () => {
     const r = await runCli(['init', '--to', 'skills'], project);

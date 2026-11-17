@@ -6,7 +6,8 @@
  *
  * Started by `maybeKeepAgentText` (global-state.mjs) from the global copy,
  * with one argument, the per-user configuration folder. It writes the files
- * the person's settings choose, with this release's text and the plain `astryx` command, and keeps every file a
+ * the person's settings choose (the computer-level skill and its links, and
+ * the folders outside any project `astryx init --to <folder>` saved), with this release's text and the plain `astryx` command, and keeps every file a
  * person edited, every file without the Astryx markers, and every link, as
  * `astryx init --user` does. It then records this release as the one that
  * wrote the text. It writes nothing to any stream and never reaches a
@@ -20,12 +21,19 @@
  */
 
 import {fileURLToPath} from 'node:url';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   COMPUTER_COMMAND,
+  computerInstallStep,
+  renderComputerAgentText,
   writeComputerAgentText,
 } from '../agent-docs/computer-agent-text.mjs';
+import {writeManagedFile} from '../agent-docs/managed-skill-file.mjs';
+import {COMPUTER_SKILL_NAME} from '../agent-docs/skill-places.mjs';
 import {
   computerAgentTextSettings,
+  computerSkillFolders,
   recordComputerAgentTextSettings,
 } from '../env/user-settings.mjs';
 import {recordAgentTextWritten} from './global-state.mjs';
@@ -35,12 +43,33 @@ const stateDir = process.argv[2];
 if (stateDir) {
   try {
     const settings = computerAgentTextSettings();
+    const folders = computerSkillFolders();
     if (settings.install) {
       const {links} = writeComputerAgentText({command: COMPUTER_COMMAND});
       recordComputerAgentTextSettings({
         install: true,
         links: [...new Set([...settings.links, ...links])],
       });
+    }
+    // The folders `astryx init --to <folder>` saved outside any project get
+    // the same text, under the same rules: an edited file is kept.
+    if (folders.length > 0) {
+      const text = renderComputerAgentText({
+        command: COMPUTER_COMMAND,
+        install: computerInstallStep(),
+      });
+      for (const folder of folders) {
+        const dir = folder.startsWith('~')
+          ? path.join(os.homedir(), folder.slice(1))
+          : folder;
+        try {
+          writeManagedFile(path.join(dir, COMPUTER_SKILL_NAME, 'SKILL.md'), text);
+        } catch {
+          // A folder that cannot be written now is tried on the next release.
+        }
+      }
+    }
+    if (settings.install || folders.length > 0) {
       const pkg = readJson(
         fileURLToPath(new URL('../../package.json', import.meta.url)),
       );

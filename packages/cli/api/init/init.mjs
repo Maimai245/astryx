@@ -19,7 +19,7 @@
  * (cli/commands/init.mjs), and the test suite stay unchanged.
  */
 
-import {run, VALID_FEATURES} from './run/run.mjs';
+import {parseFeatures, run} from './run/run.mjs';
 import {remove} from './remove/remove.mjs';
 import {user} from './user/user.mjs';
 import {AstryxError} from '../error.mjs';
@@ -90,13 +90,6 @@ export async function init(options = {}, {cwd = process.cwd()} = {}) {
     }
     return remove({cwd});
   }
-  if (options.all && options.features) {
-    throw new AstryxError(
-      '`--all` and `--features` cannot be used together: `--all` installs every feature, so a feature list is redundant.',
-      undefined,
-      ERROR_CODES.ERR_INVALID_ARGUMENT,
-    );
-  }
   return run(options, {cwd});
 }
 
@@ -133,6 +126,23 @@ async function initTo(options, cwd) {
     }
     throw err;
   }
+  if (places.length === 1 && places[0]?.kind === 'user') {
+    // The computer-level skill alone, as `--user`: nothing in the folder.
+    const refused = [
+      options.features ? '--features' : null,
+      options.all ? '--all' : null,
+      options.agentDocsPath ? '--agent-docs-path' : null,
+      options.agent ? '--agent' : null,
+    ].filter(Boolean);
+    if (refused.length > 0) {
+      throw new AstryxError(
+        `\`--to user\` cannot be combined with ${refused.join(', ')}: it writes one skill file for every agent on the computer, linked into the folders agents read, with no features, agents, or path to choose.`,
+        undefined,
+        ERROR_CODES.ERR_INVALID_ARGUMENT,
+      );
+    }
+    return user({remove: false});
+  }
   const blockOptions = [
     options.agent ? '--agent' : null,
     options.agentDocsPath ? '--agent-docs-path' : null,
@@ -147,31 +157,10 @@ async function initTo(options, cwd) {
       ERROR_CODES.ERR_INVALID_ARGUMENT,
     );
   }
-  const features = options.all
-    ? VALID_FEATURES
-    : options.features
-      ? String(options.features)
-          .split(',')
-          .map(f => f.trim().toLowerCase())
-      : ['agents'];
+  const features = parseFeatures(options) ?? ['agents'];
   if (!features.includes('agents')) {
     throw new AstryxError(
       '`--to` says where the agent docs go, and `--features` leaves out agents: add agents to `--features`, or leave `--to` out.',
-      undefined,
-      ERROR_CODES.ERR_INVALID_ARGUMENT,
-    );
-  }
-  if (
-    places.length === 1 &&
-    places[0]?.kind === 'user' &&
-    !options.features &&
-    !options.all
-  ) {
-    return user({remove: false});
-  }
-  if (options.all && options.features) {
-    throw new AstryxError(
-      '`--all` and `--features` cannot be used together: `--all` installs every feature, so a feature list is redundant.',
       undefined,
       ERROR_CODES.ERR_INVALID_ARGUMENT,
     );

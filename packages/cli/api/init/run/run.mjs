@@ -25,6 +25,7 @@ import {isOutsideProject} from '../../../foundation/env/project-scope.mjs';
 import {AGENT_DOC_PATHS} from '../../../foundation/agent-docs/agent-doc-state.mjs';
 import {
   addComputerSkillFolders,
+  assertPlaceWithin,
   computerSkillText,
   inspectAgentDocs,
   projectInstallStep,
@@ -348,60 +349,54 @@ async function applyPlaces(cwd, options, invocation, data, given) {
     }
   };
   const projectPlaces = places.filter(place => place.scope === 'project');
-  // The record comes first: a config init cannot write stops the run before
-  // any place changes.
-  if (previous && projectRoot && projectPlaces.length > 0) {
-    try {
-      saveProjectPlaces(projectRoot, projectPlaces);
-    } catch (error) {
-      // A protected config keeps the stable code every consumer-file writer
-      // uses (spec:AST-040 FR4, FR6).
-      const code = /** @type {{code?: unknown}} */ (error)?.code;
-      const stable = [
-        ERROR_CODES.ERR_CODEMOD_PROTECTED,
-        ERROR_CODES.ERR_CODEMOD_PROTECTION_SOURCE,
-      ].find(each => each === code);
-      throw new AstryxError(
-        error instanceof Error ? error.message : String(error),
-        undefined,
-        stable ?? ERROR_CODES.ERR_WRITE_FAILED,
-      );
-    }
-  }
+  const skillPlaces = projectPlaces.filter(place => place.kind !== 'agents-md');
   // `--to` naming only computer places leaves the project's places as they are.
-  if (previous && projectRoot && projectPlaces.length > 0) {
-    const kept = new Set(projectPlaces.map(savedName));
-    for (const place of previous) {
-      if (kept.has(savedName(place))) continue;
-      if (place.kind === 'agents-md') {
-        const before = readAgentDocTexts(projectRoot, AGENT_DOC_PATHS);
-        for (const rel of removeProjectAgentDocs(cwd)) {
-          const fromRoot = path
-            .relative(projectRoot, path.join(cwd, rel))
-            .split(path.sep)
-            .join('/');
-          const text = before.get(fromRoot) ?? null;
-          data.docsChanges.push({
-            path: fromRoot,
-            change: 'removed',
-            from: text == null ? null : managedBlockVersion(text),
-            to: null,
-          });
-        }
-        continue;
-      }
-      record(place, removeSkillPlace(place, projectRoot));
+  const kept = new Set(projectPlaces.map(savedName));
+  const leaving =
+    previous && projectRoot && projectPlaces.length > 0
+      ? previous.filter(place => !kept.has(savedName(place)))
+      : [];
+  // Everything that can stop the run comes before any change: each project
+  // skill file stays inside the project (a skills folder linked out of it,
+  // such as `.claude` linked to `~/.claude`, is refused), the skill renders,
+  // and the config takes the record.
+  if (projectRoot) {
+    for (const place of [...skillPlaces, ...leaving]) {
+      if (place.kind !== 'agents-md') assertPlaceWithin(place, projectRoot);
     }
   }
+  const text =
+    skillPlaces.length > 0 && projectRoot ? await projectSkillText(projectRoot) : null;
+  if (previous && projectRoot && projectPlaces.length > 0) {
+    saveProjectPlaces(projectRoot, projectPlaces);
+  }
+  // The new places are written before the old ones are cleared, so the
+  // project never goes without the guidance.
   if (projectPlaces.some(place => place.kind === 'agents-md')) {
     await applyAgents(cwd, options, invocation, data);
   }
-  const skillPlaces = projectPlaces.filter(place => place.kind !== 'agents-md');
-  if (skillPlaces.length > 0 && projectRoot) {
-    const text = await projectSkillText(projectRoot);
-    for (const place of skillPlaces)
-      record(place, writeSkillPlace(place, projectRoot, text));
+  if (text != null && projectRoot) {
+    for (const place of skillPlaces) record(place, writeSkillPlace(place, projectRoot, text));
   }
+  for (const place of leaving) {
+    if (place.kind !== 'agents-md') {
+      record(place, removeSkillPlace(place, /** @type {string} */ (projectRoot)));
+      continue;
+    }
+    const root = /** @type {string} */ (projectRoot);
+    const before = readAgentDocTexts(root, AGENT_DOC_PATHS);
+    for (const rel of removeProjectAgentDocs(cwd)) {
+      const fromRoot = path.relative(root, path.join(cwd, rel)).split(path.sep).join('/');
+      const text = before.get(fromRoot) ?? null;
+      data.docsChanges.push({
+        path: fromRoot,
+        change: 'removed',
+        from: text == null ? null : managedBlockVersion(text),
+        to: null,
+      });
+    }
+  }
+
   const computerFolders = places.filter(
     place => place.scope === 'computer' && place.kind === 'folder',
   );
@@ -526,6 +521,39 @@ function applyTemplate(cwd, {templateName}, invocation, data) {
 }
 
 /**
+ * The features `--features` or `--all` names, or null when neither is given.
+ * Throws AstryxError for an unknown feature (ERR_UNKNOWN_FEATURE) and for
+ * `--all` with `--features` (ERR_INVALID_ARGUMENT). The one parser every
+ * init path uses.
+ * @param {{features?: string, all?: boolean}} options
+ * @returns {string[] | null}
+ */
+export function parseFeatures(options) {
+  if (options.all && options.features) {
+    throw new AstryxError(
+      '`--all` and `--features` cannot be used together: `--all` installs every feature, so a feature list is redundant.',
+      undefined,
+      ERROR_CODES.ERR_INVALID_ARGUMENT,
+    );
+  }
+  if (!options.features && !options.all) return null;
+  const features = options.all
+    ? VALID_FEATURES
+    : String(options.features)
+        .split(',')
+        .map(f => f.trim().toLowerCase());
+  const invalid = features.filter(f => !VALID_FEATURES.includes(f));
+  if (invalid.length > 0) {
+    throw new AstryxError(
+      `Unknown features: ${invalid.join(', ')}. Valid features: ${VALID_FEATURES.join(', ')}`,
+      undefined,
+      ERROR_CODES.ERR_UNKNOWN_FEATURE,
+    );
+  }
+  return features;
+}
+
+/**
  * Run the install path of the non-interactive init flow (the default no-flags
  * install plus `--features` / `--all`). Performs the side effects (agent-docs
  * install, template scaffold) and returns an `init.run` receipt. Progress is
@@ -541,21 +569,8 @@ export async function run(options = {}, {cwd = process.cwd(), places} = {}) {
   const invocation = getCliInvocation();
 
   // Non-interactive feature install: --features or --all.
-  if (options.features || options.all) {
-    const features = options.all
-      ? VALID_FEATURES
-      : String(options.features)
-          .split(',')
-          .map(f => f.trim().toLowerCase());
-
-    const invalid = features.filter(f => !VALID_FEATURES.includes(f));
-    if (invalid.length > 0) {
-      throw new AstryxError(
-        `Unknown features: ${invalid.join(', ')}. Valid features: ${VALID_FEATURES.join(', ')}`,
-        undefined,
-        ERROR_CODES.ERR_UNKNOWN_FEATURE,
-      );
-    }
+  const features = parseFeatures(options);
+  if (features) {
 
     /** @type {import('../init.type.mjs').InitRunData} */
     const data = {

@@ -58,6 +58,9 @@ import {findConfigPath} from '../../foundation/config/project.mjs';
 import {loadModuleWithParser} from '../../foundation/fs/module-loader.mjs';
 import {parseConfig} from '../../authoring/config/parse.mjs';
 import {setConfigValues} from '../../foundation/config/config-writer.mjs';
+import {PathSafetyError, assertWithin} from '../../foundation/fs/path-safety.mjs';
+import {AstryxError} from '../error.mjs';
+import {ERROR_CODES} from '../../foundation/response/error-codes.mjs';
 
 export {COMPUTER_COMMAND, COMPUTER_INSTALL_STEP, displayHomePath};
 
@@ -149,13 +152,51 @@ export async function readProjectPlaces(projectRoot) {
  * @param {readonly import('../../foundation/agent-docs/skill-places.mjs').SkillPlace[]} places
  */
 export function saveProjectPlaces(projectRoot, places) {
-  const {file, changed} = setConfigValues(projectRoot, [
-    ['skills.to', projectPlacesValue(places)],
-  ]);
+  let written;
+  try {
+    written = setConfigValues(projectRoot, [['skills.to', projectPlacesValue(places)]]);
+  } catch (error) {
+    // A protected config keeps the stable code every consumer-file writer
+    // uses (spec:AST-040 FR4, FR6).
+    const code = /** @type {{code?: unknown}} */ (error)?.code;
+    const stable = [
+      ERROR_CODES.ERR_CODEMOD_PROTECTED,
+      ERROR_CODES.ERR_CODEMOD_PROTECTION_SOURCE,
+    ].find(each => each === code);
+    throw new AstryxError(
+      error instanceof Error ? error.message : String(error),
+      undefined,
+      stable ?? ERROR_CODES.ERR_WRITE_FAILED,
+    );
+  }
   // A config left holding nothing says what no config says, so it goes, as
   // after a move back to the default place in a project init gave a config.
-  if (changed && /^export default \{\};?\s*$/u.test(fs.readFileSync(file, 'utf8'))) {
-    fs.unlinkSync(file);
+  if (
+    written.changed &&
+    /^export default \{\};?\s*$/u.test(fs.readFileSync(written.file, 'utf8'))
+  ) {
+    fs.unlinkSync(written.file);
+  }
+}
+
+/**
+ * Refuse a project place whose skill files resolve outside the project, as
+ * through a skills folder linked out of it, before anything is written.
+ * @param {import('../../foundation/agent-docs/skill-places.mjs').SkillPlace} place
+ * @param {string} projectRoot
+ */
+export function assertPlaceWithin(place, projectRoot) {
+  for (const file of placeSkillFiles(place, projectRoot)) {
+    try {
+      assertWithin(path.relative(projectRoot, file), projectRoot, {label: 'skill file'});
+    } catch (err) {
+      if (!(err instanceof PathSafetyError)) throw err;
+      throw new AstryxError(
+        `${err.message} Astryx writes the project skill only inside the project; make that folder a real folder in the project, or choose another place with \`--to\`.`,
+        undefined,
+        ERROR_CODES.ERR_PATH_TRAVERSAL,
+      );
+    }
   }
 }
 
