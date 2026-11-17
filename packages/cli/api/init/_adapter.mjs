@@ -195,3 +195,23 @@ export function addComputerSkillFolders(folders) {
   const saved = computerSkillFolders();
   recordComputerSkillFolders([...new Set([...saved, ...folders])]);
 }
+
+/**
+ * Drop folders outside any project from the ones the settings file records.
+ * @param {readonly string[]} folders as saved: `~/<path>` or absolute
+ */
+export function dropComputerSkillFolders(folders) {
+  const drop = new Set(folders);
+  const saved = computerSkillFolders();
+  if (saved.some(each => drop.has(each))) {
+    recordComputerSkillFolders(saved.filter(each => !drop.has(each)));
+  }
+}
+
+/**
+ * The folders outside any project the settings file records.
+ * @returns {string[]}
+ */
+export function computerSkillFoldersSaved() {
+  return computerSkillFolders();
+}

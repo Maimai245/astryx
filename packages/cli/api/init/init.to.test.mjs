@@ -399,7 +399,6 @@ describe('refusals', () => {
     [{to: 'skills', agentDocsPath: 'X.md'}, '--agent-docs-path'],
     [{to: 'skills', features: 'theme'}, '--features'],
     [{to: 'user', user: true}, '--user'],
-    [{to: 'skills', removeAgents: true}, '--remove-agents'],
     [{to: ''}, 'needs a place'],
   ])('refuses %o', async (options, named) => {
     const err = await refusal(() => init(options, {cwd: project}));

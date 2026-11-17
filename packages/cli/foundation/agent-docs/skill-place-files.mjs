@@ -73,7 +73,8 @@ export function writeSkillPlace(place, projectRoot, text) {
 }
 
 /**
- * Remove each skill file of `place` that is an unedited Astryx file.
+ * Remove each skill file of `place` that is an unedited Astryx file, and
+ * each folder that leaves empty, up to the folder the place names.
  * @param {import('./skill-places.mjs').SkillPlace} place
  * @param {string | null} projectRoot
  * @returns {Array<{file: string, action: import('./managed-skill-file.mjs').ManagedFileAction, reason?: 'edited' | 'not-astryx'}>}
@@ -81,7 +82,14 @@ export function writeSkillPlace(place, projectRoot, text) {
 export function removeSkillPlace(place, projectRoot) {
   // Folders the removal empties go too, up to the folder the place names, or
   // the project root for the skills folders.
-  const stop = place.kind === 'folder' ? place.dir : projectRoot;
+  // A folder place goes too when the removal leaves it empty; the project
+  // root never does.
+  const stop =
+    place.kind !== 'folder'
+      ? projectRoot
+      : place.dir === projectRoot
+        ? projectRoot
+        : path.dirname(place.dir);
   return placeSkillFiles(place, projectRoot).map(file => {
     const result = removeManagedFileIfOwned(file);
     if (result.action === 'removed' && stop)

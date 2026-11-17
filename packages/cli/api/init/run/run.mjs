@@ -63,9 +63,11 @@ import {logger} from '../../logger.mjs';
 
 /**
  * The places one run writes. `previous`: with `--to`, the project places the
- * config saved before it, which the run moves off; null without `--to`.
- * `homeRefusal`: why the project root takes no project place (checkPlaces).
- * @typedef {{places: import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace[], projectRoot: string | null, previous: import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace[] | null, homeRefusal?: string}} InitPlaces
+ * config saved before it, which the run moves off; null without `--to`, and
+ * with `--once`. `once`: a copy that is saved nowhere, so no later run
+ * refreshes it. `homeRefusal`: why the project root takes no project place
+ * (checkPlaces).
+ * @typedef {{places: import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace[], projectRoot: string | null, previous: import('../../../foundation/agent-docs/skill-places.mjs').SkillPlace[] | null, once?: boolean, homeRefusal?: string}} InitPlaces
  */
 
 export const VALID_FEATURES = ['agents', 'theme', 'template'];
@@ -324,6 +326,7 @@ async function placesFor(cwd, given) {
 async function applyPlaces(cwd, options, invocation, data, given) {
   const {places, projectRoot, previous} = given;
   data.to = places.map(savedName);
+  data.once = Boolean(given.once);
   const shown = (/** @type {string} */ file) =>
     projectRoot && !path.relative(projectRoot, file).startsWith('..')
       ? path.relative(projectRoot, file).split(path.sep).join('/')
@@ -484,7 +487,7 @@ async function applyComputerPlaces(places, data, record) {
     const text = computerSkillText(computerAgentCommand());
     for (const place of computerFolders)
       record(place, writeSkillPlace(place, null, text));
-    addComputerSkillFolders(computerFolders.map(savedName));
+    if (!given.once) addComputerSkillFolders(computerFolders.map(savedName));
   }
   if (places.some(place => place.kind === 'user')) {
     data.user = (await user()).data;
@@ -673,6 +676,7 @@ export async function run(options = {}, {cwd = process.cwd(), places} = {}) {
       templatePath: null,
       nextSteps: false,
       to: [],
+      once: false,
       skills: [],
       user: null,
     };
@@ -709,6 +713,7 @@ export async function run(options = {}, {cwd = process.cwd(), places} = {}) {
     templatePath: null,
     nextSteps: !outside,
     to: [],
+    once: false,
     skills: [],
     user: null,
   };
