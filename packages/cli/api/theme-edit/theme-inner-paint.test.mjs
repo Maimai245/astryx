@@ -112,6 +112,18 @@ describe('a paint drawn inside a part', () => {
       const gap = await answer(q, 'i');
       expect(gap.writes[0], q).toMatch(/ --on kbd$/);
     }
+    // Only a part of the keys' own component holds their gap: the space
+    // between avatars or dividers is never written on a part of another
+    // component that holds them (a chat message, a context menu).
+    for (const [q, other] of [
+      ['more space between the avatars', 'chat-message'],
+      ['more space between the dividers', 'context-menu'],
+    ]) {
+      const gap = await answer(q, 'i');
+      expect(gap.writes.join('\n'), q).not.toMatch(
+        new RegExp(` --on ${other}\\b`),
+      );
+    }
     const text = await answer('make the radio list item text red', 'i');
     expect(text.writes.join('\n')).not.toMatch(
       / color '#dc2626' --on radio-list-item/,

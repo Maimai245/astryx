@@ -14720,9 +14720,8 @@ export function draftAnswer(ctx, env, question) {
       ? ` on ${on}${f.when ? ` (${f.when.replace(':', ' ')})` : ''}${f.state ? ` when ${f.state}` : ''}`
       : ' for the whole theme';
     // The gap between parts (the space between a shortcut's keys) is the
-    // gap of the one nearest part that lays them out, when the part named
-    // has no gap of its own: the answer is on that part. A part many parts
-    // lay out (a button) names no one of them.
+    // gap of the one nearest part of the same component that lays them out,
+    // when the part named has no gap of its own: the answer is on that part.
     if (
       on &&
       !FAMILIES[on] &&
@@ -14730,9 +14729,14 @@ export function draftAnswer(ctx, env, question) {
       /\b(gaps?|between)\b/.test(c.text) &&
       !C.MAP[one(on)]?.own?.gap
     ) {
+      // (Only a part of the named part's own component: the keys' Kbd, never
+      // a chat message holding an avatar or a menu holding a divider.)
+      const comp = ctx.project.target.get(one(on))?.component;
       const holders = Object.keys(C.MAP).filter(
         k =>
           k !== one(on) &&
+          comp != null &&
+          ctx.project.target.get(k)?.component === comp &&
           (C.MAP[k].contains ?? []).includes(one(on)) &&
           C.MAP[k].own?.gap,
       );
