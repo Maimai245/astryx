@@ -55,6 +55,15 @@ export const doc = {
         'Install all features (agents, theme, template); refused with --features. Prints their guidance instead of the getting-started steps',
     },
     {
+      flag: '--to <places>',
+      param: 'options.to',
+      description:
+        'Where the Astryx skill goes, a comma list: agents-md (the AGENTS.md block, the default), skills (.agents/skills/astryx and .claude/skills/astryx in the project), ' +
+        'user (this computer, same as --user), or a folder written as a path (./team-skills, ~/team-skills). The choice is saved, so a later init writes the same places: ' +
+        'in astryx.config `skills.to` for the project, in the settings file for a folder outside it. Moving a project off a place removes the skill there. ' +
+        'An unknown place exits 1 with ERR_INVALID_ARGUMENT',
+    },
+    {
       flag: '--remove-agents',
       param: 'options.removeAgents',
       description:
@@ -90,7 +99,8 @@ export const doc = {
     {label: 'Default setup', cli: 'astryx init'},
     {label: 'All features, no prompts', cli: 'astryx init --all'},
     {label: 'Machine-readable receipt', cli: 'astryx init --json'},
-    {label: 'Agent text for the whole computer', cli: 'astryx init --user'},
+    {label: 'The skill in the project skills folders', cli: 'astryx init --to skills'},
+    {label: 'Agent text for the whole computer', cli: 'astryx init --to user'},
     {label: 'Remove the computer-level agent text and turn it off', cli: 'astryx init --user --remove-agents'},
   ],
   outsideProject: 'own',

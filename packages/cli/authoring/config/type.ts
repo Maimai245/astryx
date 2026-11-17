@@ -108,6 +108,20 @@ export interface AstryxConfig {
    */
   discover?: DiscoverSource;
   /**
+   * Where the Astryx skill goes in this project. `astryx init --to` writes
+   * it; `astryx init` and `astryx upgrade` keep each place current.
+   */
+  skills?: {
+    /**
+     * The places, one or a list: `'agents-md'` (the managed block in
+     * AGENTS.md and the agent files beside it), `'skills'` (the project
+     * skills folders, `.agents/skills/astryx` and `.claude/skills/astryx`),
+     * or a folder in the project written as a path (`'./team-skills'`), which
+     * gets `<folder>/astryx/SKILL.md`. Leaving it out means `'agents-md'`.
+     */
+    to?: string | string[];
+  };
+  /**
    * EXPERIMENTAL — shape may change and is not part of the stable config
    * contract. Provisional home for features still being proven out.
    */

@@ -19,11 +19,17 @@
  * (cli/commands/init.mjs), and the test suite stay unchanged.
  */
 
-import {run} from './run/run.mjs';
+import {run, VALID_FEATURES} from './run/run.mjs';
 import {remove} from './remove/remove.mjs';
 import {user} from './user/user.mjs';
 import {AstryxError} from '../error.mjs';
 import {ERROR_CODES} from '../../foundation/response/error-codes.mjs';
+import {
+  SkillPlaceError,
+  parsePlaces,
+  placeNames,
+} from '../../foundation/agent-docs/skill-places.mjs';
+import {readProjectPlaces, skillProjectRoot} from './_adapter.mjs';
 
 export {getNextSteps, getWorkflowSteps} from './run/run.mjs';
 
@@ -49,6 +55,7 @@ export {getNextSteps, getWorkflowSteps} from './run/run.mjs';
  * @returns {Promise<import('./init.type.mjs').InitRunResponse | import('./init.type.mjs').InitRemoveResponse | import('./init.type.mjs').InitUserResponse>}
  */
 export async function init(options = {}, {cwd = process.cwd()} = {}) {
+  if (options.to !== undefined) return initTo(options, cwd);
   if (options.user) {
     // Its own path: fixed files in the home folder, never the project
     // agent-docs resolution, so it works the same in every folder.
@@ -91,4 +98,84 @@ export async function init(options = {}, {cwd = process.cwd()} = {}) {
     );
   }
   return run(options, {cwd});
+}
+
+/**
+ * `init --to`: parse the places, refuse what cannot combine with them, and
+ * write each. `--to user` alone is `--user`: the same leaf and receipt.
+ * @param {InitOptions} options
+ * @param {string} cwd
+ * @returns {Promise<import('./init.type.mjs').InitRunResponse | import('./init.type.mjs').InitUserResponse>}
+ */
+async function initTo(options, cwd) {
+  const refused = [
+    options.user ? '--user' : null,
+    options.removeAgents ? '--remove-agents' : null,
+  ].filter(Boolean);
+  if (refused.length > 0) {
+    throw new AstryxError(
+      `\`--to\` cannot be combined with ${refused.join(', ')}: \`--to user\` is the computer-level skill, and \`--remove-agents\` removes instead of writing.`,
+      undefined,
+      ERROR_CODES.ERR_INVALID_ARGUMENT,
+    );
+  }
+  const projectRoot = skillProjectRoot(cwd);
+  let places;
+  try {
+    places = parsePlaces(placeNames(options.to ?? []), {cwd, projectRoot});
+  } catch (err) {
+    if (err instanceof SkillPlaceError) {
+      throw new AstryxError(
+        err.message,
+        undefined,
+        ERROR_CODES.ERR_INVALID_ARGUMENT,
+      );
+    }
+    throw err;
+  }
+  const blockOptions = [
+    options.agent ? '--agent' : null,
+    options.agentDocsPath ? '--agent-docs-path' : null,
+  ].filter(Boolean);
+  if (
+    blockOptions.length > 0 &&
+    !places.some(place => place.kind === 'agents-md')
+  ) {
+    throw new AstryxError(
+      `${blockOptions.join(' and ')} choose the agent files of the AGENTS.md block: add agents-md to \`--to\`, or leave them out.`,
+      undefined,
+      ERROR_CODES.ERR_INVALID_ARGUMENT,
+    );
+  }
+  const features = options.all
+    ? VALID_FEATURES
+    : options.features
+      ? String(options.features)
+          .split(',')
+          .map(f => f.trim().toLowerCase())
+      : ['agents'];
+  if (!features.includes('agents')) {
+    throw new AstryxError(
+      '`--to` says where the agent docs go, and `--features` leaves out agents: add agents to `--features`, or leave `--to` out.',
+      undefined,
+      ERROR_CODES.ERR_INVALID_ARGUMENT,
+    );
+  }
+  if (
+    places.length === 1 &&
+    places[0]?.kind === 'user' &&
+    !options.features &&
+    !options.all
+  ) {
+    return user({remove: false});
+  }
+  if (options.all && options.features) {
+    throw new AstryxError(
+      '`--all` and `--features` cannot be used together: `--all` installs every feature, so a feature list is redundant.',
+      undefined,
+      ERROR_CODES.ERR_INVALID_ARGUMENT,
+    );
+  }
+  const previous = projectRoot ? await readProjectPlaces(projectRoot) : null;
+  return run(options, {cwd, places: {places, projectRoot, previous}});
 }

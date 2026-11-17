@@ -97,6 +97,14 @@ function buildSchemas() {
       debug: debugSchema.optional(),
       gapReport: gapReportHandlerSchema.optional(),
       discover: discoverSourceSchema.optional(),
+      skills: z
+        .object({
+          to: z
+            .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
+            .optional(),
+        })
+        .strict()
+        .optional(),
       experimental: z
         .object({
           xle: z
